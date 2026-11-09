@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ta'lim</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    --text: var(--tg-theme-text-color, #1c1c1e);
+    --hint: var(--tg-theme-hint-color, #8e8e93);
+    --link: var(--tg-theme-link-color, #2b7de9);
+    --btn: var(--tg-theme-button-color, #2b7de9);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --card: var(--tg-theme-section-bg-color, var(--bg));
+    --ok: #2fb35a;
+    --bad: #e5484d;
+    --warn: #f5a524;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg2); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #app { max-width: 640px; margin: 0 auto; padding: 12px 12px 90px; }
+  h1 { font-size: 20px; margin: 4px 4px 12px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--hint); font-weight: 600; margin: 18px 6px 8px; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+  .profile { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--btn); color: var(--btn-text);
+    display: grid; place-items: center; font-weight: 700; font-size: 19px; flex: none; }
+  .muted { color: var(--hint); font-size: 13px; }
+  .balance { margin-left: auto; text-align: right; }
+  .balance b { font-size: 17px; display: block; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: var(--card); border-radius: var(--radius); padding: 14px 12px; border: 0; color: var(--text);
+    text-align: left; font: inherit; cursor: pointer; min-height: 84px; display: flex; flex-direction: column; justify-content: space-between; }
+  .tile .ic { font-size: 26px; }
+  .tile b { font-size: 14px; }
+  .tile:active, .row:active, .opt:active { opacity: .7; }
+  .list { background: var(--card); border-radius: var(--radius); overflow: hidden; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 0; width: 100%; background: none;
+    color: var(--text); font: inherit; text-align: left; cursor: pointer; border-bottom: 1px solid var(--bg2); }
+  .row:last-child { border-bottom: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+  .chev { color: var(--hint); }
+  .badge { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--bg2); white-space: nowrap; }
+  .badge.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 13px; font: inherit; font-weight: 600;
+    background: var(--btn); color: var(--btn-text); cursor: pointer; margin-top: 8px; }
+  .btn.sec { background: var(--bg2); color: var(--link); }
+  .btn:disabled { opacity: .5; }
+  .tabs { display: flex; background: var(--card); border-radius: 12px; padding: 4px; gap: 4px; margin-bottom: 10px; }
+  .tabs button { flex: 1; border: 0; background: none; padding: 8px; border-radius: 9px; font: inherit; color: var(--text); cursor: pointer; }
+  .tabs button.on { background: var(--btn); color: var(--btn-text); font-weight: 600; }
+  input, select { width: 100%; padding: 12px; border-radius: 12px; border: 0; background: var(--card); color: var(--text); font: inherit; margin-bottom: 10px; }
+  .q-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .timer { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .timer.low { color: var(--bad); }
+  .progress { height: 5px; background: var(--bg2); border-radius: 9px; overflow: hidden; margin-bottom: 12px; }
+  .progress i { display: block; height: 100%; background: var(--btn); transition: width .2s; }
+  .q-body { font-size: 17px; font-weight: 500; white-space: pre-wrap; margin-bottom: 12px; }
+  .q-img { width: 100%; border-radius: 12px; margin-bottom: 12px; background: var(--bg2); }
+  .opt { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; padding: 13px; margin-bottom: 8px;
+    border-radius: 12px; border: 2px solid var(--bg2); background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+  .opt .l { font-weight: 700; width: 22px; flex: none; }
+  .opt.sel { border-color: var(--btn); }
+  .res-big { font-size: 44px; font-weight: 800; text-align: center; margin: 6px 0 0; }
+  .center { text-align: center; }
+  .mark-ok { color: var(--ok); } .mark-bad { color: var(--bad); }
+  .medal { width: 28px; text-align: center; font-weight: 700; }
+  .me { background: color-mix(in srgb, var(--btn) 10%, transparent); }
+  .empty { text-align: center; color: var(--hint); padding: 30px 10px; }
+  .pre { white-space: pre-wrap; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(0,0,0,.82); color: #fff;
+    padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 10; max-width: 90%; text-align: center; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--bg2); border-top-color: var(--btn); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 60px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .thumb { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; background: var(--bg2); flex: none; }
+  .book-img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 12px; background: var(--bg2); }
+  a { color: var(--link); }
+</style>
+</head>
+<body>
+<div id="app"><div class="spinner"></div></div>
+<script>
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const app = document.getElementById('app');
+  const L = 'ABCDEF';
+  let ME = null;
+  const stack = []; // ekranlar tarixi (orqaga tugmasi uchun)
+  let quiz = null;
+
+  if (tg) { tg.ready(); tg.expand(); }
+
+  // ---------- yordamchilar ----------
+  const h = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (n) => `${String(Math.trunc(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so'm`;
+  const pad = (n) => String(n).padStart(2, '0');
+  const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`; };
+  const date = (ms) => { const d = new Date(ms); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`; };
+  const haptic = (t = 'light') => { try { tg.HapticFeedback.impactOccurred(t); } catch (e) {} };
+
+  function toast(text) {
+    const el = document.createElement('div');
+    el.className = 'toast'; el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  async function api(path, body) {
+    const opt = { method: body ? 'POST' : 'GET', headers: { 'X-Init-Data': tg ? tg.initData : '' } };
+    if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    const r = await fetch(path, opt);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(data.error || 'Xatolik'); e.code = data.code; e.data = data; throw e; }
+    return data;
+  }
+
+  const openBot = (payload) => {
+    const url = `https://t.me/${ME.bot}${payload ? `?start=${payload}` : ''}`;
+    if (tg) { tg.openTelegramLink(url); tg.close(); } else location.href = url;
+  };
+  const openLink = (url) => (tg ? tg.openLink(url) : window.open(url, '_blank'));
+
+  function confirmBox(text) {
+    return new Promise((res) => (tg && tg.showConfirm ? tg.showConfirm(text, res) : res(window.confirm(text))));
+  }
+
+  // ---------- navigatsiya ----------
+  function go(screen, ...args) {
+    if (quiz && screen !== quizScreen && screen !== resultScreen) stopQuizTimer();
+    stack.push([screen, args]);
+    return render();
+  }
+  function back() {
+    if (quiz && quiz.running) {
+      return confirmBox("Testdan chiqasizmi? Javoblaringiz saqlanmaydi.").then((ok) => {
+        if (!ok) return;
+        stopQuizTimer(); quiz = null; stack.pop(); render();
+      });
+    }
+    stack.pop();
+    if (!stack.length) stack.push([homeScreen, []]);
+    return render();
+  }
+  async function render() {
+    const [screen, args] = stack[stack.length - 1];
+    if (tg) { stack.length > 1 ? tg.BackButton.show() : tg.BackButton.hide(); tg.MainButton.hide(); }
+    window.scrollTo(0, 0);
+    try { await screen(...args); }
+    catch (e) { app.innerHTML = `<div class="card center"><p>⚠️ ${h(e.message)}</p><button class="btn sec" data-back>⬅️ Orqaga</button></div>`; bind(); }
+  }
+  if (tg) tg.BackButton.onClick(back);
+
+  const loading = () => { app.innerHTML = '<div class="spinner"></div>'; };
+
+  // data-* atributlar orqali tugmalarga hodisa biriktirish
+  const actions = {};
+  function bind() {
+    app.querySelectorAll('[data-act]').forEach((el) => {
+      el.onclick = () => { haptic(); const fn = actions[el.dataset.act]; if (fn) fn(el.dataset.arg, el); };
+    });
+    app.querySelectorAll('[data-back]').forEach((el) => { el.onclick = back; });
+  }
+
+  // ---------- Bosh sahifa ----------
+  async function homeScreen() {
+    loading();
+    ME = await api('/api/me');
+    const u = ME.user; const f = ME.features;
+    const tiles = [
+      f.tests && ['📝', 'Test ishlash', 'tests'],
+      f.videos && ['🎬', 'Videodarslar va testlar', 'videos'],
+      f.rating && ['🏆', 'Reyting', 'rating'],
+      ['💰', 'Balans', 'balance'],
+      f.books && ['📚', 'Kitoblar', 'books'],
+      f.centers && ['🏫', "O'quv markaz va maktablar", 'centers'],
+      f.teacher && ['👨‍🏫', "O'qituvchilar uchun", 'teacher'],
+      f.support && ['☎️', "Admin bilan bog'lanish", 'support'],
+    ].filter(Boolean);
+    app.innerHTML = `
+      <div class="card profile">
+        <div class="avatar">${h((u.first_name || '?')[0])}</div>
+        <div><b>${h(u.first_name)} ${h(u.last_name)}</b><div class="muted">${h(u.phone)}</div></div>
+        <div class="balance"><span class="muted">Balans</span><b>${money(u.balance)}</b></div>
+      </div>
+      <div class="grid">${tiles.map(([ic, t, k]) => `<button class="tile" data-act="open" data-arg="${k}"><span class="ic">${ic}</span><b>${h(t)}</b></button>`).join('')}</div>`;
+    bind();
+  }
+  actions.open = (k) => {
+    const map = { tests: testsCats, videos: videoGroups, rating: ratingScreen, balance: balanceScreen, books: booksScreen, centers: centersScreen };
+    if (map[k]) return go(map[k]);
+    if (k === 'teacher') return openBot('teacher');
+    if (k === 'support') return openBot('support');
+  };
+
+  // ---------- Testlar ----------
+  async function testsCats() {
+    app.innerHTML = `<h1>📝 Test ishlash</h1><div class="list">${ME.testCategories.map((c) =>
+      `<button class="row" data-act="tcat" data-arg="${c.code}"><span class="grow title">${h(c.name)}</span><span class="chev">›</span></button>`).join('')}</div>`;
+    bind();
+  }
+  actions.tcat = (code) => go(testsList, code);
+
+  const itemBadge = (it) => (it.owned ? `<span class="badge ok">${it.price ? '✅ Ochiq' : '🆓 Bepul'}</span>` : `<span class="badge">🔒 ${money(it.price)}</span>`);
+
+  async function testsList(code) {
+    loading();
+    const cat = ME.testCategories.find((c) => c.code === code);
+    const list = await api(`/api/tests?cat=${code}`);
+    app.innerHTML = `<h1>📝 ${h(cat.name)}</h1>` + (list.length ? `<div class="list">${list.map((v) =>
+      `<button class="row" data-act="tvar" data-arg="${v.id}"><span class="grow"><div class="title">${h(v.title)}</div>
+       <div class="muted">❓ ${v.qcount} ta savol · ⏱ ${v.time_limit ? `${v.time_limit} daqiqa` : 'cheklanmagan'}</div></span>${itemBadge(v)}</button>`).join('')}</div>`
+      : '<div class="empty">Hozircha variantlar qo\'shilmagan</div>');
+    actions.tvar = (id) => go(itemScreen, 'variant', list.find((x) => String(x.id) === id), code);
+    bind();
+  }
+
+  // Test varianti yoki video mavzu sahifasi
+  async function itemScreen(type, item, parent) {
+    if (type === 'topic') { loading(); item = await api(`/api/topic?id=${item.id}`); }
+    const isTopic = type === 'topic';
+    let html = `<h1>${isTopic ? '🎬' : '📝'} ${h(item.title)}</h1><div class="card">`;
+    if (item.description) html += `<p class="pre">${h(item.description)}</p>`;
+    html += `<div class="muted">❓ ${item.qcount} ta savol${isTopic ? ' (takrorlash testi)' : ''}<br>⏱ Vaqt: ${item.time_limit ? `${item.time_limit} daqiqa` : 'cheklanmagan'}<br>💵 Narxi: ${item.price ? money(item.price) : 'bepul'}</div></div>`;
+    if (!item.owned) {
+      html += `<div class="card"><div class="muted">Balansingiz: <b>${money(ME.user.balance)}</b></div>
+        <button class="btn" data-act="buy">💳 Sotib olish — ${money(item.price)}</button></div>`;
+    } else {
+      if (isTopic) {
+        html += item.video_url
+          ? `<button class="btn" data-act="vurl">▶️ Videoni ko'rish</button>`
+          : `<button class="btn" data-act="vsend">▶️ Videoni ko'rish (chatga yuboriladi)</button>`;
+      }
+      if (item.qcount) html += `<button class="btn ${isTopic ? 'sec' : ''}" data-act="qstart">📝 ${isTopic ? 'Takrorlash uchun test' : 'Testni boshlash'}</button>`;
+    }
+    app.innerHTML = html;
+    actions.buy = async (a, el) => {
+      if (!(await confirmBox(`«${item.title}» — ${money(item.price)}. Sotib olasizmi?`))) return;
+      el.disabled = true;
+      try {
+        const r = await api('/api/buy', { type, id: item.id });
+        ME.user.balance = r.balance; item.owned = true;
+        toast('✅ Sotib olindi!'); haptic('medium');
+        itemScreen(type, item, parent);
+      } catch (e) {
+        el.disabled = false;
+        if (e.code === 'nofunds' && (await confirmBox(`${e.message}\n\nBalansni to'ldirasizmi?`))) go(balanceScreen);
+        else if (e.code !== 'nofunds') toast(e.message);
+      }
+    };
+    actions.vurl = () => openLink(item.video_url);
+    actions.vsend = async (a, el) => {
+      el.disabled = true;
+      try { await api('/api/topic/send', { id: item.id }); toast('🎬 Video chatga yuborildi'); if (tg) setTimeout(() => tg.close(), 900); }
+      catch (e) { toast(e.message); el.disabled = false; }
+    };
+    actions.qstart = () => startQuiz(type, item.id);
+    bind();
+  }
+
+  // ---------- Videodarslar ----------
+  async function videoGroups() {
+    app.innerHTML = `<h1>🎬 Videodarslar</h1><div class="list">${ME.videoGroups.map((g) =>
+      `<button class="row" data-act="vgrp" data-arg="${g.code}"><span class="grow title">${h(g.name)}</span><span class="chev">›</span></button>`).join('')}</div>`;
+    bind();
+  }
+  actions.vgrp = (code) => go(videoList, code);
+
+  async function videoList(code) {
+    loading();
+    const g = ME.videoGroups.find((x) => x.code === code);
+    const list = await api(`/api/videos?grp=${code}`);
+    app.innerHTML = `<h1>🎬 ${h(g.name)}</h1>` + (list.length ? `<div class="list">${list.map((t) =>
+      `<button class="row" data-act="vtop" data-arg="${t.id}"><span class="grow"><div class="title">${h(t.title)}</div>
+       <div class="muted">📺 Video${t.qcount ? ` + 📝 ${t.qcount} ta savol` : ''}</div></span>${itemBadge(t)}</button>`).join('')}</div>`
+      : '<div class="empty">Hozircha mavzular qo\'shilmagan</div>');
+    actions.vtop = (id) => go(itemScreen, 'topic', { id }, code);
+    bind();
+  }
+
+  // ---------- Test ishlash ----------
+  function stopQuizTimer() { if (quiz && quiz.timer) { clearInterval(quiz.timer); quiz.timer = null; } }
+
+  async function startQuiz(type, id) {
+    loading();
+    try {
+      const d = await api('/api/quiz/start', { type, id });
+      quiz = { ...d, type, ownerId: id, idx: 0, answers: {}, running: true, offset: Date.now() - d.now };
+      go(quizScreen);
+    } catch (e) { toast(e.message); back(); }
+  }
+
+  function quizScreen() {
+    const qz = quiz;
+    if (!qz) return back();
+    const q = qz.questions[qz.idx];
+    const total = qz.questions.length;
+    const sel = qz.answers[q.id];
+    app.innerHTML = `
+      <div class="q-head"><span class="muted">${qz.idx + 1} / ${total}</span>${qz.deadline ? '<span class="timer" id="timer"></span>' : ''}</div>
+      <div class="progress"><i style="width:${(qz.idx / total) * 100}%"></i></div>
+      <div class="card">
+        ${q.photo ? `<img class="q-img" src="${q.photo}" alt="">` : ''}
+        ${q.body ? `<div class="q-body">${h(q.body)}</div>` : ''}
+        ${q.options.map((o, i) => `<button class="opt ${sel === i ? 'sel' : ''}" data-act="pick" data-arg="${i}"><span class="l">${L[i]})</span><span>${h(o)}</span></button>`).join('')}
+      </div>
+      <div style="display:flex; gap:8px">
+        ${qz.idx > 0 ? '<button class="btn sec" style="flex:1" data-act="prev">⬅️</button>' : ''}
+        <button class="btn" style="flex:3" data-act="next">${qz.idx + 1 < total ? 'Keyingi ➡️' : '✅ Yakunlash'}</button>
+      </div>`;
+    actions.pick = (i) => { qz.answers[q.id] = Number(i); quizScreen(); };
+    actions.prev = () => { qz.idx -= 1; quizScreen(); };
+    actions.next = async () => {
+      if (qz.idx + 1 < total) { qz.idx += 1; return quizScreen(); }
+      const left = total - Object.keys(qz.answers).length;
+      if (left && !(await confirmBox(`${left} ta savolga javob berilmagan. Yakunlaysizmi?`))) return;
+      submitQuiz(false);
+    };
+    bind();
+    if (qz.deadline && !qz.timer) qz.timer = setInterval(tick, 500);
+    tick();
+  }
+
+  function tick() {
+    if (!quiz || !quiz.deadline) return;
+    const left = quiz.deadline - (Date.now() - quiz.offset);
+    const el = document.getElementById('timer');
+    if (el) { el.textContent = `⏱ ${mmss(left)}`; el.classList.toggle('low', left < 60000); }
+    if (left <= 0 && quiz.running) { toast('⏰ Vaqt tugadi!'); submitQuiz(true); }
+  }
+
+  async function submitQuiz(timeUp) {
+    const qz = quiz;
+    if (!qz || !qz.running) return;
+    qz.running = false;
+    stopQuizTimer();
+    loading();
+    try {
+      const r = await api('/api/quiz/submit', { attempt: qz.attempt, answers: qz.answers });
+      haptic('heavy');
+      stack.pop(); // test ekranini tarixdan olib tashlaymiz
+      go(resultScreen, qz, r, timeUp);
+    } catch (e) { toast(e.message); stack.pop(); render(); }
+  }
+
+  function resultScreen(qz, r, timeUp) {
+    quiz = null;
+    const mark = r.pct >= 86 ? "🏆 A'lo!" : r.pct >= 71 ? '👍 Yaxshi!' : r.pct >= 56 ? '🙂 Qoniqarli' : "📚 Ko'proq takrorlang";
+    app.innerHTML = `
+      <div class="card center">
+        <div class="muted">${h(qz.title)}</div>
+        <div class="res-big">${r.correct}/${r.total}</div>
+        <div><b>${r.pct}%</b> · ${mark}</div>
+        ${timeUp || r.late ? '<div class="muted">⏰ Vaqt tugadi</div>' : ''}
+      </div>
+      <h2>Javoblar</h2>
+      <div class="list">${r.details.map((d, i) => {
+        const q = qz.questions.find((x) => x.id === d.id) || { body: '' };
+        const ok = d.your === d.correct;
+        return `<div class="row"><span class="${ok ? 'mark-ok' : 'mark-bad'}">${ok ? '✅' : '❌'}</span>
+          <span class="grow"><div class="title">${i + 1}. ${h((q.body || 'Rasmdagi savol').slice(0, 70))}</div>
+          <div class="muted">Sizning javobingiz: ${d.your == null ? '—' : L[d.your]} · To'g'ri: <b>${L[d.correct]}</b></div></span>
+          ${d.has_sol ? `<button class="badge" style="border:0;cursor:pointer" data-act="sol" data-arg="${d.id}:${i + 1}">🎥 Yechim</button>` : ''}</div>`;
+      }).join('')}</div>
+      <button class="btn" data-act="again">🔁 Qayta ishlash</button>
+      <button class="btn sec" data-back>⬅️ Orqaga</button>`;
+    actions.sol = async (arg) => {
+      const [id, num] = arg.split(':');
+      try {
+        const res = await api('/api/solution/send', { id: Number(id), num: Number(num) });
+        if (res.url) openLink(res.url); else toast('🎥 Video yechim chatga yuborildi');
+      } catch (e) { toast(e.message); }
+    };
+    actions.again = () => { stack.pop(); startQuiz(qz.type, qz.ownerId); };
+    bind();
+  }
+
+  // ---------- Reyting ----------
+  async function ratingScreen(p = 'w') {
+    loading();
+    const r = await api(`/api/rating?p=${p}`);
+    const medals = ['🥇', '🥈', '🥉'];
+    app.innerHTML = `<h1>🏆 Reyting</h1>
+      <div class="tabs">${[['w', 'Shu hafta'], ['m', 'Shu oy'], ['a', 'Umumiy']].map(([k, t]) => `<button class="${k === p ? 'on' : ''}" data-act="rp" data-arg="${k}">${t}</button>`).join('')}</div>
+      ${r.me ? `<div class="card"><b>📍 Sizning o'rningiz: ${r.me.rank} / ${r.me.total}</b><div class="muted">⭐ ${r.me.pts} ball · ${r.me.tests} ta test${r.me.next ? ` · keyingi o'ringacha ${r.me.next} ball` : ''}</div></div>`
+        : '<div class="card muted">Bu davrda hali test yechmagansiz. Test ishlab reytingga kiring! 💪</div>'}
+      ${r.top.length ? `<div class="list">${r.top.map((x, i) => `<div class="row ${x.me ? 'me' : ''}"><span class="medal">${medals[i] || i + 1}</span>
+        <span class="grow title">${h(x.name)}${x.me ? ' (siz)' : ''}</span><span class="muted">${x.tests} test</span><b>${x.pts}</b></div>`).join('')}</div>`
+        : '<div class="empty">Hozircha natijalar yo\'q</div>'}
+      <div class="muted center">Ball — har bir testdagi eng yaxshi natijadagi to'g'ri javoblar yig'indisi</div>`;
+    actions.rp = (k) => { stack[stack.length - 1][1] = [k]; ratingScreen(k); };
+    bind();
+  }
+
+  // ---------- Balans ----------
+  async function balanceScreen() {
+    loading();
+    ME = await api('/api/me');
+    const hist = await api('/api/history');
+    const f = ME.features;
+    const names = { referral: '👥 Taklif bonusi', admin: "💳 To'ldirish", purchase: '🛒 Xarid', book: "📚 Kitob e'loni", center: "🏫 Markaz e'loni", teacher: "👨‍🏫 O'qituvchi testi" };
+    app.innerHTML = `<h1>💰 Balans</h1>
+      <div class="card center"><div class="muted">Joriy balans</div><div class="res-big">${money(ME.user.balance)}</div></div>
+      ${f.topup ? `<div class="card"><b>💳 Balansni to'ldirish</b><p class="pre muted">${h(ME.paymentInfo)}</p>
+        <button class="btn" data-act="topup">📸 Chek yuborish (botda)</button></div>` : ''}
+      ${f.referral ? `<div class="card"><b>👥 Do'stlarni taklif qiling</b>
+        <p class="muted">Har bir do'stingiz kanalga a'zo bo'lib ro'yxatdan o'tganda balansingizga <b>${money(ME.referralBonus)}</b> qo'shiladi. Taklif qilganlaringiz: <b>${ME.refCount}</b></p>
+        <input readonly value="${h(ME.refLink)}" onclick="this.select()">
+        <button class="btn" data-act="share">📤 Ulashish</button><button class="btn sec" data-act="copy">📋 Nusxa olish</button></div>` : ''}
+      <h2>Oxirgi amallar</h2>
+      ${hist.length ? `<div class="list">${hist.map((x) => `<div class="row"><span class="grow"><div class="title">${names[x.type] || h(x.type)}</div><div class="muted">${date(x.at)}</div></span>
+        <b class="${x.amount > 0 ? 'mark-ok' : ''}">${x.amount > 0 ? '+' : '−'}${money(Math.abs(x.amount))}</b></div>`).join('')}</div>` : '<div class="empty">Amallar yo\'q</div>'}`;
+    actions.topup = () => openBot('topup');
+    actions.share = () => {
+      const url = `https://t.me/share/url?url=${encodeURIComponent(ME.refLink)}&text=${encodeURIComponent("Bolalar uchun testlar va videodarslar! Qo'shiling:")}`;
+      tg ? tg.openTelegramLink(url) : openLink(url);
+    };
+    actions.copy = async () => { try { await navigator.clipboard.writeText(ME.refLink); toast('📋 Nusxa olindi'); } catch (e) { toast('Havolani bosib, qo\'lda nusxa oling'); } };
+    bind();
+  }
+
+  // ---------- Kitoblar ----------
+  async function booksScreen(query = '', page = 0) {
+    loading();
+    const r = await api(`/api/books?q=${encodeURIComponent(query)}&page=${page}`);
+    app.innerHTML = `<h1>📚 Kitoblar</h1>
+      <input id="bq" type="search" placeholder="🔎 Kitob nomi yoki muallif" value="${h(query)}">
+      <div class="muted" style="margin:0 6px 8px">${query ? `«${h(query)}» bo'yicha` : 'Sotuvdagi kitoblar'}: ${r.total} ta</div>
+      ${r.items.length ? `<div class="list">${r.items.map((b) => `<button class="row" data-act="book" data-arg="${b.id}">
+        ${b.photo ? `<img class="thumb" src="${b.photo}" loading="lazy" alt="">` : '<span class="thumb" style="display:grid;place-items:center">📖</span>'}
+        <span class="grow"><div class="title">${h(b.title)}</div><div class="muted">${h(b.author || '')}${b.price_text ? ` · ${h(b.price_text)}` : ''}</div></span><span class="chev">›</span></button>`).join('')}</div>`
+        : '<div class="empty">Hech narsa topilmadi</div>'}
+      <div style="display:flex;gap:8px">${page > 0 ? '<button class="btn sec" data-act="bpg" data-arg="-1">⬅️</button>' : ''}${(page + 1) * 20 < r.total ? '<button class="btn sec" data-act="bpg" data-arg="1">➡️</button>' : ''}</div>
+      <button class="btn" data-act="addbook">➕ Kitob qo'shish — ${money(ME.prices.book)} / ${ME.prices.days} kun</button>`;
+    const inp = document.getElementById('bq');
+    let t;
+    inp.oninput = () => { clearTimeout(t); t = setTimeout(() => { const v = inp.value.trim(); if (v.length === 0 || v.length >= 2) { stack[stack.length - 1][1] = [v, 0]; booksScreen(v, 0); } }, 600); };
+    actions.bpg = (d) => { const p = page + Number(d); stack[stack.length - 1][1] = [query, p]; booksScreen(query, p); };
+    actions.book = (id) => go(bookScreen, id);
+    actions.addbook = () => openBot('addbook');
+    bind();
+  }
+
+  async function bookScreen(id) {
+    loading();
+    const b = await api(`/api/book?id=${id}`);
+    app.innerHTML = `${b.photo ? `<img class="book-img" src="${b.photo}" alt="">` : ''}
+      <h1 style="margin-top:12px">${h(b.title)}</h1>
+      <div class="card">${b.author ? `<div>✍️ ${h(b.author)}</div>` : ''}${b.price_text ? `<div>💵 ${h(b.price_text)}</div>` : ''}
+      ${b.description ? `<p class="pre">${h(b.description)}</p>` : ''}<div>📞 <a href="tel:${h(b.phone.replace(/[^\d+]/g, ''))}">${h(b.phone)}</a></div></div>`;
+    bind();
+  }
+
+  // ---------- O'quv markazlar ----------
+  let REGIONS = null;
+  async function centersScreen(kind = 'center', ri = '', di = 'all') {
+    loading();
+    if (!REGIONS) REGIONS = await api('/api/regions');
+    const list = ri !== '' ? await api(`/api/centers?kind=${kind}&ri=${ri}&di=${di}`) : null;
+    const k = ME.centerKinds;
+    app.innerHTML = `<h1>🏫 O'quv markaz va maktablar</h1>
+      <div class="tabs">${Object.entries(k).map(([key, v]) => `<button class="${key === kind ? 'on' : ''}" data-act="ck" data-arg="${key}">${v.icon} ${h(v.name)}</button>`).join('')}</div>
+      <select id="ri"><option value="">📍 Viloyatni tanlang</option>${REGIONS.map((r, i) => `<option value="${i}" ${String(i) === String(ri) ? 'selected' : ''}>${h(r.name)}</option>`).join('')}</select>
+      ${ri !== '' ? `<select id="di"><option value="all">Barcha tumanlar</option>${REGIONS[ri].districts.map((d, i) => `<option value="${i}" ${String(i) === String(di) ? 'selected' : ''}>${h(d)}</option>`).join('')}</select>` : ''}
+      ${list ? (list.length ? `<div class="list">${list.map((c) => `<button class="row" data-act="cen" data-arg="${c.id}"><span>${k[kind].icon}</span><span class="grow"><div class="title">${h(c.name)}</div><div class="muted">${h(c.district)}</div></span><span class="chev">›</span></button>`).join('')}</div>`
+        : `<div class="empty">Bu hududda hozircha ${h(k[kind].plural.toLowerCase())} yo'q</div>`) : ''}
+      <button class="btn" data-act="addcen">➕ Qo'shish — ${money(ME.prices.center)} / ${ME.prices.days} kun</button>`;
+    const set = (a) => { stack[stack.length - 1][1] = a; centersScreen(...a); };
+    document.getElementById('ri').onchange = (e) => set([kind, e.target.value, 'all']);
+    const diEl = document.getElementById('di');
+    if (diEl) diEl.onchange = (e) => set([kind, ri, e.target.value]);
+    actions.ck = (key) => set([key, ri, di]);
+    actions.cen = (id) => go(centerScreen, id);
+    actions.addcen = () => openBot('addcenter');
+    bind();
+  }
+
+  async function centerScreen(id) {
+    loading();
+    const c = await api(`/api/center?id=${id}`);
+    const kind = ME.centerKinds[c.kind];
+    app.innerHTML = `<h1>${kind.icon} ${h(c.name)}</h1><div class="card">
+      <div class="muted">${h(kind.name)}</div>
+      <p>📍 ${h(c.region)}, ${h(c.district)}${c.address ? `<br>🏠 ${h(c.address)}` : ''}</p>
+      <div>📞 <a href="tel:${h((c.phone || '').replace(/[^\d+]/g, ''))}">${h(c.phone)}</a></div></div>
+      ${c.lat != null ? '<button class="btn" data-act="map">🗺 Xaritada ko\'rish</button>' : ''}`;
+    actions.map = () => openLink(`https://www.google.com/maps?q=${c.lat},${c.lon}`);
+    bind();
+  }
+
+  // ---------- Ishga tushirish ----------
+  async function boot() {
+    try {
+      stack.push([homeScreen, []]);
+      await homeScreen();
+    } catch (e) {
+      stack.length = 0;
+      let extra = '';
+      if (e.code === 'not_subscribed') extra = `<button class="btn" id="join">📢 Kanalga o'tish</button><button class="btn sec" id="retry">✅ Obuna bo'ldim</button>`;
+      if (e.code === 'not_registered') extra = '<p class="muted">Botga qaytib /start ni bosing va ro\'yxatdan o\'ting.</p><button class="btn" id="close">Botga qaytish</button>';
+      app.innerHTML = `<div class="card center" style="margin-top:40px"><p style="font-size:40px;margin:0">${e.code === 'blocked' ? '🚫' : e.code === 'maintenance' ? '🛠' : '⚠️'}</p><p>${h(e.message)}</p>${extra}</div>`;
+      const j = document.getElementById('join'); if (j) j.onclick = () => e.data && e.data.channelUrl && (tg ? tg.openTelegramLink(e.data.channelUrl) : openLink(e.data.channelUrl));
+      const r = document.getElementById('retry'); if (r) r.onclick = () => { loading(); boot(); };
+      const c = document.getElementById('close'); if (c) c.onclick = () => (tg ? tg.close() : null);
+    }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

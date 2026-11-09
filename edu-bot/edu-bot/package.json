@@ -1,0 +1,20 @@
+{
+  "name": "edu-bot",
+  "version": "2.6.0",
+  "description": "Ta'lim Telegram boti: testlar, videodarslar, balans, kitoblar, o'quv markazlar",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "knex": "^3.1.0",
+    "mysql2": "^3.12.0",
+    "telegraf": "^4.16.3"
+  }
+}

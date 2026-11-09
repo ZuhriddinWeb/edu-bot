@@ -1,0 +1,23 @@
+TA'LIM BOTI v2.6.0 — BITTA FAYLLI VERSIYA
+==========================================
+
+Papkada 3 ta fayl bor:
+  bot.js        — botning butun kodi (mini ilova sahifasi ham ichida)
+  package.json  — kerakli kutubxonalar ro'yxati
+  .env.example  — sozlamalar namunasi
+
+O'RNATISH (yangi, bo'sh papkaga):
+1. Eski botni to'xtating (Ctrl+C; pm2 bo'lsa: pm2 delete all).
+2. Shu 3 ta faylni yangi bo'sh papkaga qo'ying, masalan: C:\edu-bot2
+3. Eski bot papkasidan quyidagilarni shu yangi papkaga ko'chiring:
+     .env            — sozlamalaringiz (token, adminlar, kanallar)
+     data\bot.sqlite — bazangiz (foydalanuvchilar, testlar, balanslar)
+   Agar .env bo'lmasa: .env.example dan nusxa olib, nomini .env qiling va to'ldiring.
+4. Shu papkada terminal oching va yozing:
+     npm install
+     npm start
+5. Konsolda shunday chiqishi kerak:
+     🤖 Bot ishga tushdi: @... (v2.6.0, papka: C:\edu-bot2)
+   Botda «🛠 Admin panel» — sarlavhada «v2.6.0» ko'rinadi. /version buyrug'i ham bor.
+
+Doimiy ishlashi uchun (server):  pm2 start bot.js --name edu-bot && pm2 save
