@@ -1,10 +1,13 @@
-TA'LIM BOTI v2.6.0 — BITTA FAYLLI VERSIYA
+TA'LIM BOTI v2.7.0 — BITTA FAYLLI VERSIYA
 ==========================================
 
 Papkada 3 ta fayl bor:
   bot.js        — botning butun kodi (mini ilova sahifasi ham ichida)
   package.json  — kerakli kutubxonalar ro'yxati
   .env.example  — sozlamalar namunasi
+
+YANGILASH (oldingi bitta faylli versiyadan): botni to'xtating, bot.js va package.json ni almashtiring,
+so'ng albatta  npm install  (sertifikat uchun yangi kutubxona qo'shildi) va  npm start.
 
 O'RNATISH (yangi, bo'sh papkaga):
 1. Eski botni to'xtating (Ctrl+C; pm2 bo'lsa: pm2 delete all).
@@ -17,7 +20,7 @@ O'RNATISH (yangi, bo'sh papkaga):
      npm install
      npm start
 5. Konsolda shunday chiqishi kerak:
-     🤖 Bot ishga tushdi: @... (v2.6.0, papka: C:\edu-bot2)
-   Botda «🛠 Admin panel» — sarlavhada «v2.6.0» ko'rinadi. /version buyrug'i ham bor.
+     🤖 Bot ishga tushdi: @... (v2.7.0, papka: C:\edu-bot2)
+   Botda «🛠 Admin panel» — sarlavhada «v2.7.0» ko'rinadi. /version buyrug'i ham bor.
 
 Doimiy ishlashi uchun (server):  pm2 start bot.js --name edu-bot && pm2 save
