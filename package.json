@@ -1,20 +1,23 @@
 {
   "name": "edu-bot",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Ta'lim Telegram boti: testlar, videodarslar, balans, kitoblar, o'quv markazlar",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "migrate-sqlite": "node bot.js migrate-sqlite"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.65",
-    "better-sqlite3": "^11.7.0",
     "dotenv": "^16.4.7",
     "knex": "^3.1.0",
     "mysql2": "^3.12.0",
     "telegraf": "^4.16.3"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.7.0"
   }
 }

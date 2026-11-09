@@ -1,4 +1,4 @@
-TA'LIM BOTI v2.7.0 — BITTA FAYLLI VERSIYA
+TA'LIM BOTI v2.8.0 — BITTA FAYLLI VERSIYA
 ==========================================
 
 Papkada 3 ta fayl bor:
@@ -20,7 +20,9 @@ O'RNATISH (yangi, bo'sh papkaga):
      npm install
      npm start
 5. Konsolda shunday chiqishi kerak:
-     🤖 Bot ishga tushdi: @... (v2.7.0, papka: C:\edu-bot2)
-   Botda «🛠 Admin panel» — sarlavhada «v2.7.0» ko'rinadi. /version buyrug'i ham bor.
+     🤖 Bot ishga tushdi: @... (v2.8.0, papka: C:\edu-bot2)
+   Botda «🛠 Admin panel» — sarlavhada «v2.8.0» ko'rinadi. /version buyrug'i ham bor.
 
 Doimiy ishlashi uchun (server):  pm2 start bot.js --name edu-bot && pm2 save
+
+RAILWAY'GA JOYLASH: RAILWAY.md faylini o'qing (MySQL ulash, domen, eski ma'lumotlarni ko'chirish).
