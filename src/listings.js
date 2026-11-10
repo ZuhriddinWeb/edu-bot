@@ -1,13 +1,14 @@
 // Pullik e'lonlar (kitob, o'quv markaz) uchun umumiy: "Mening e'lonlarim", uzaytirish, o'chirish
 const { Markup } = require('telegraf');
 const { db } = require('./db');
-const { esc, money, fmtDate, now, DAY, getNum, charge, safeEdit } = require('./utils');
+const { esc, money, fmtDate, now, DAY, getNum, charge, safeEdit, isAdmin } = require('./utils');
 
 /**
  * opts: { table, p (callback prefiksi), priceKey, txType, title(row) }
  */
 function registerMine(bot, opts) {
-  const { table, p, priceKey, txType, title, home } = opts;
+  const { table, p, priceKey, daysKey, txType, title, home } = opts;
+  const priceFor = async (ctx) => (isAdmin(ctx.from.id) ? 0 : getNum(priceKey));
   const backHome = [Markup.button.callback('⬅️ Orqaga', home)];
 
   async function showList(ctx) {
@@ -29,8 +30,8 @@ function registerMine(bot, opts) {
     await ctx.answerCbQuery();
     const r = await db(table).where({ id: Number(ctx.match[1]), user_tg: ctx.from.id, is_active: 1 }).first();
     if (!r) return safeEdit(ctx, "E'lon topilmadi.", Markup.inlineKeyboard([[Markup.button.callback('⬅️ Orqaga', `${p}_my`)]]));
-    const price = await getNum(priceKey);
-    const days = await getNum('listing_days');
+    const price = await priceFor(ctx);
+    const days = await getNum(daysKey);
     const status = r.expires_at > now() ? `🟢 Faol: ${fmtDate(r.expires_at)} gacha` : `🔴 Muddati tugagan (${fmtDate(r.expires_at)})`;
     return safeEdit(ctx, `<b>${esc(title(r))}</b>\n${status}`, {
       parse_mode: 'HTML',
@@ -45,8 +46,8 @@ function registerMine(bot, opts) {
   bot.action(new RegExp(`^${p}_ext:(\\d+)$`), async (ctx) => {
     const r = await db(table).where({ id: Number(ctx.match[1]), user_tg: ctx.from.id, is_active: 1 }).first();
     if (!r) return ctx.answerCbQuery("E'lon topilmadi");
-    const price = await getNum(priceKey);
-    const days = await getNum('listing_days');
+    const price = await priceFor(ctx);
+    const days = await getNum(daysKey);
     const res = await charge(ctx.from.id, price, txType, `Uzaytirish #${r.id}: ${title(r)}`, async (trx) => {
       const base = Math.max(Number(r.expires_at), now());
       await trx(table).where({ id: r.id }).update({ expires_at: base + days * DAY });

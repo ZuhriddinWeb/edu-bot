@@ -9,7 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
 const { db } = require('./db');
-const REGIONS = require('./data/regions');
+const REGIONS = require('./regions');
 const { CENTER_KINDS, FEATURES } = require('./constants');
 const cats = require('./categories');
 const {
@@ -17,8 +17,9 @@ const {
 } = require('./utils');
 const { log } = require('./logger');
 const { isSubscribed } = require('./subscription');
-const { canSeeSolutions, sendSolution } = require('./quiz');
+const { canSeeSolutions, sendSolution, sendTestSolution, testSolution } = require('./quiz');
 const { leaderboard } = require('./handlers/rating');
+const { pickForWebapp } = require('./ads');
 
 const WEBAPP_DIR = path.join(__dirname, '..', 'webapp');
 const GRACE_MS = 60 * 1000; // vaqt tugagach javob yuborish uchun qo'shimcha muhlat
@@ -62,13 +63,13 @@ function send(res, status, body, headers = {}) {
   res.end(data);
 }
 
-function readBody(req) {
+function readBody(req, limit = 100 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
-      if (size > 100 * 1024) {
+      if (size > limit) {
         reject(new ApiError(413, 'too_large'));
         req.destroy();
       } else chunks.push(c);
@@ -95,7 +96,7 @@ async function auth(req) {
   if (u.is_blocked && !admin) throw new ApiError(403, 'blocked', 'Hisobingiz bloklangan');
   if (!admin && !(await isOn('bot'))) throw new ApiError(403, 'maintenance', 'Texnik ishlar olib borilmoqda');
   if (!admin && !(await isOn('webapp'))) throw new ApiError(403, 'disabled', "Mini ilova vaqtincha o'chirilgan");
-  if (!admin && !(await isSubscribed(botRef.telegram, tg))) throw new ApiError(403, 'not_subscribed', "Mini ilovadan foydalanish uchun kanalimizga obuna bo'ling", { channelUrl: config.CHANNEL_URL });
+  if (!admin && !(await isSubscribed(botRef.telegram, tg))) throw new ApiError(403, 'not_subscribed', "Mini ilovadan foydalanish uchun kanalimizga obuna bo'ling", { channelUrl: require('./subscription').channel.url });
   if (!u.last_seen || now() - u.last_seen > 5 * 60 * 1000) await db('users').where({ tg_id: tg }).update({ last_seen: now() });
   return { tg, u, admin };
 }
@@ -126,11 +127,19 @@ const routes = {
       refCount,
       referralBonus: await getNum('referral_bonus'),
       paymentInfo: await getSetting('payment_info'),
-      prices: { book: await getNum('book_price'), center: await getNum('center_price'), days: await getNum('listing_days') },
+      minTopup: await getNum('min_topup'),
+      teacherPrice: await getNum('teacher_test_price'),
+      adminUsername: config.ADMIN_USERNAME,
+      prices: { book: await getNum('book_price'), center: await getNum('center_price'), bookDays: await getNum('book_days'), centerDays: await getNum('center_days') },
       testCategories: cats.list('test').map((c) => ({ code: c.code, name: c.name })),
       videoGroups: cats.list('video').map((c) => ({ code: c.code, name: c.name })),
       centerKinds: CENTER_KINDS,
-      channelUrl: config.CHANNEL_URL,
+      channelUrl: require('./subscription').channel.url,
+      ad: await (async () => {
+        if (me.admin) return null;
+        const a = await pickForWebapp();
+        return a ? { text: a.text, photo: a.media_type === 'photo' ? fileUrl(a.media_id) : null, btn_text: a.btn_text, btn_url: a.btn_url } : null;
+      })(),
     };
   },
 
@@ -141,9 +150,11 @@ const routes = {
     wlog(me.tg, `Testlar: ${esc(cat.name)}`);
     const list = await db('variants').where({ category: cat.code, is_active: 1 }).orderBy('id');
     const owned = await purchasedIds(me.tg, 'variant');
+    const pdfOwned = await purchasedIds(me.tg, 'pdf');
     return Promise.all(list.map(async (v) => ({
       id: v.id, title: v.title, price: v.price, time_limit: v.time_limit,
       owned: !v.price || me.admin || owned.has(v.id), qcount: await qCount('variant', v.id),
+      pdf: v.pdf_id ? { price: v.pdf_price, owned: !v.pdf_price || me.admin || pdfOwned.has(v.id) } : null,
     })));
   },
 
@@ -173,10 +184,11 @@ const routes = {
   },
 
   'POST /api/buy': async (me, q, body) => {
-    const type = body.type === 'topic' ? 'topic' : 'variant';
+    const type = ['topic', 'pdf'].includes(body.type) ? body.type : 'variant';
     await need(type === 'topic' ? 'videos' : 'tests', me);
-    const item = await db(type === 'topic' ? 'topics' : 'variants').where({ id: Number(body.id), is_active: 1 }).first();
-    if (!item) throw new ApiError(404, 'not_found', 'Topilmadi');
+    let item = await db(type === 'topic' ? 'topics' : 'variants').where({ id: Number(body.id), is_active: 1 }).first();
+    if (!item || (type === 'pdf' && !item.pdf_id)) throw new ApiError(404, 'not_found', 'Topilmadi');
+    if (type === 'pdf') item = { id: item.id, price: item.pdf_price, title: `${item.title} (PDF)` };
     const r = await purchase(me.tg, type, item);
     if (r === 'nofunds') throw new ApiError(402, 'nofunds', `Balansda mablag' yetarli emas. Kerak: ${money(item.price)}`);
     if (r === 'ok') wlog(me.tg, `🛒 Sotib oldi: ${esc(item.title)} — ${money(item.price)}`);
@@ -198,12 +210,33 @@ const routes = {
     return { ok: true };
   },
 
+  // Sotib olingan PDFni bot orqali chatga yuborish
+  'POST /api/pdf/send': async (me, q, body) => {
+    await need('tests', me);
+    const v = await db('variants').where({ id: Number(body.id), is_active: 1 }).first();
+    if (!v || !v.pdf_id) throw new ApiError(404, 'not_found', 'PDF topilmadi');
+    if (!(await hasAccess(me.tg, 'pdf', { id: v.id, price: v.pdf_price }))) throw new ApiError(402, 'not_owned', 'Avval sotib oling');
+    await botRef.telegram.sendDocument(me.tg, v.pdf_id, { caption: `📄 <b>${esc(v.title)}</b> — elektron variant`, parse_mode: 'HTML' });
+    wlog(me.tg, `📥 PDF oldi: ${esc(v.title)}`);
+    return { ok: true };
+  },
+
   'POST /api/quiz/start': async (me, q, body) => {
-    const type = body.type === 'topic' ? 'topic' : 'variant';
-    await need(type === 'topic' ? 'videos' : 'tests', me);
-    const item = await db(type === 'topic' ? 'topics' : 'variants').where({ id: Number(body.id), is_active: 1 }).first();
-    if (!item) throw new ApiError(404, 'not_found', 'Topilmadi');
-    if (!(await hasAccess(me.tg, type, item))) throw new ApiError(402, 'not_owned', 'Avval sotib oling');
+    const type = ['topic', 'tt'].includes(body.type) ? body.type : 'variant';
+    await need(type === 'topic' ? 'videos' : type === 'tt' ? 'teacher' : 'tests', me);
+    let item;
+    if (type === 'tt') {
+      // O'qituvchi testi: kod bo'yicha, bir marta, o'z testini yechib bo'lmaydi
+      item = await db('teacher_tests').where({ code: String(body.code || '').toLowerCase(), is_deleted: 0 }).first();
+      if (!item) throw new ApiError(404, 'not_found', 'Test topilmadi');
+      if (!item.is_open) throw new ApiError(403, 'closed', "Test o'qituvchi tomonidan yopilgan");
+      if (Number(item.teacher_tg) === me.tg) throw new ApiError(403, 'own', "Bu sizning testingiz — uni o'quvchilaringiz yechadi");
+      if (await db('results').where({ user_tg: me.tg, owner_type: 'tt', owner_id: item.id }).first()) throw new ApiError(409, 'done', 'Siz bu testni allaqachon yechgansiz');
+    } else {
+      item = await db(type === 'topic' ? 'topics' : 'variants').where({ id: Number(body.id), is_active: 1 }).first();
+      if (!item) throw new ApiError(404, 'not_found', 'Topilmadi');
+      if (!(await hasAccess(me.tg, type, item))) throw new ApiError(402, 'not_owned', 'Avval sotib oling');
+    }
     const qs = await db('questions').where({ owner_type: type, owner_id: item.id }).orderBy('id');
     if (!qs.length) throw new ApiError(400, 'empty', "Bu testga hali savollar qo'shilmagan");
     const t = now();
@@ -212,7 +245,7 @@ const routes = {
     const title = type === 'topic' ? `${item.title} — takrorlash testi` : item.title;
     wlog(me.tg, `▶️ Testni boshladi: ${esc(title)}`);
     return {
-      attempt, title, deadline, now: t,
+      attempt, title, deadline, now: t, reveal: type !== 'tt',
       questions: qs.map((x) => ({ id: x.id, body: x.body, options: JSON.parse(x.options), photo: fileUrl(x.photo_id) })),
     };
   },
@@ -221,6 +254,9 @@ const routes = {
     const a = await db('quiz_attempts').where({ id: Number(body.attempt), user_tg: me.tg }).first();
     if (!a) throw new ApiError(404, 'not_found');
     if (a.finished_at) throw new ApiError(409, 'finished', 'Bu test allaqachon topshirilgan');
+    if (a.owner_type === 'tt' && (await db('results').where({ user_tg: me.tg, owner_type: 'tt', owner_id: a.owner_id }).first())) {
+      throw new ApiError(409, 'done', 'Siz bu testni allaqachon yechgansiz');
+    }
     const t = now();
     const late = a.deadline && t > Number(a.deadline) + GRACE_MS;
     const answers = late ? {} : body.answers || {};
@@ -233,9 +269,31 @@ const routes = {
     });
     await db('quiz_attempts').where({ id: a.id }).update({ finished_at: t });
     await db('results').insert({ user_tg: me.tg, owner_type: a.owner_type, owner_id: a.owner_id, correct, total: qs.length, created_at: t });
+    if (a.owner_type === 'tt') {
+      require('./handlers/teacher').notifyTeacher(botRef.telegram, me.tg, a.owner_id, correct, qs.length).catch(() => {});
+      wlog(me.tg, `🏁 O'qituvchi testini tugatdi (tt#${a.owner_id}): ${correct}/${qs.length}`);
+      const pctT = qs.length ? Math.round((correct / qs.length) * 100) : 0;
+      // To'g'ri javoblar ko'rsatilmaydi (boshqalarga tarqalmasligi uchun)
+      return { correct, total: qs.length, pct: pctT, late: !!late, reveal: false, test_sol: !!(await testSolution('tt', a.owner_id)), details: details.map((d) => ({ id: d.id, your: d.your })) };
+    }
+    const cert = await require('./handlers/certs').maybeAward(botRef.telegram, me.tg, a.owner_type, a.owner_id, correct, qs.length);
+    const certMin = (await isOn('certs')) ? await getNum('cert_min_percent') : null;
     const pct = qs.length ? Math.round((correct / qs.length) * 100) : 0;
     wlog(me.tg, `🏁 Testni tugatdi (${a.owner_type}#${a.owner_id}): ${correct}/${qs.length} (${pct}%)${late ? ' ⏰ kechikdi' : ''}`);
-    return { correct, total: qs.length, pct, late: !!late, details };
+    return { correct, total: qs.length, pct, late: !!late, reveal: true, test_sol: !!(await testSolution(a.owner_type, a.owner_id)), details, cert, certMin };
+  },
+
+  // Butun test uchun bitta video yechim — botga yuboriladi
+  'POST /api/solution/test': async (me, q, body) => {
+    const type = String(body.type || '');
+    const id = Number(body.id);
+    if (!['variant', 'topic', 'tt'].includes(type)) throw new ApiError(400, 'bad_input');
+    const owner = await testSolution(type, id);
+    if (!owner) throw new ApiError(404, 'not_found', "Video yechim yo'q");
+    if (!(await canSeeSolutions(me.tg, type, id))) throw new ApiError(403, 'not_solved', 'Avval testni yeching');
+    await sendTestSolution(botRef.telegram, me.tg, owner, owner.title);
+    wlog(me.tg, `🎥 Test video yechimini oldi (${type}#${id})`);
+    return { ok: true, url: owner.sol_type === 'url' ? owner.sol_ref : null };
   },
 
   'POST /api/solution/send': async (me, q, body) => {
@@ -326,6 +384,29 @@ const routes = {
   },
 };
 
+// Qo'shimcha imkoniyatlar (to'ldirish, e'lonlar, o'qituvchilar, sertifikatlar...)
+const extra = require('./webappRoutes')({ ApiError, need, wlog, fileUrl, bot: () => botRef, qCount });
+Object.assign(routes, extra.routes);
+// Admin panel (faqat ADMIN_IDS)
+const admin = require('./adminRoutes')({ ApiError, wlog, fileUrl, bot: () => botRef, qCount });
+Object.assign(routes, admin.routes);
+
+// Xom faylni o'qish (video/PDF yuklash uchun, 50 MB gacha)
+function readRaw(req, limit) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new ApiError(413, 'too_large', 'Fayl juda katta (50 MB gacha — Telegram cheklovi)')); req.destroy(); } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+// Rasm yuboriladigan so'rovlar uchun kattaroq hajm
+const UPLOAD_ROUTES = new Set(['/api/topup', '/api/support', '/api/books/add', '/api/teacher/question']);
+
 // Rasmlarni Telegramdan olib berish (savol rasmlari, kitob rasmlari)
 async function serveFile(res, q) {
   if (!q.f || q.s !== fileSig(q.f)) return send(res, 403, { error: 'forbidden' });
@@ -343,6 +424,12 @@ async function serveFile(res, q) {
 
 function serveStatic(res, urlPath) {
   const file = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+  // Bitta faylli (bot.js) versiyada sahifa fayl ichiga joylangan
+  const embedded = global.__EMBEDDED_FILES && global.__EMBEDDED_FILES[`webapp/${file}`];
+  if (embedded != null) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    return res.end(embedded);
+  }
   const full = path.join(WEBAPP_DIR, file);
   if (!full.startsWith(WEBAPP_DIR) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
     return send(res, 404, 'Not found', { 'Content-Type': 'text/plain' });
@@ -358,11 +445,21 @@ function startServer(bot) {
     const url = new URL(req.url, 'http://x');
     const q = Object.fromEntries(url.searchParams);
     try {
+      // Railway / hosting uchun holat tekshiruvi
+      if (url.pathname === '/health') return send(res, 200, { ok: true, uptime: Math.round(process.uptime()) });
       if (req.method === 'GET' && url.pathname === '/api/file') return await serveFile(res, q);
+      if (req.method === 'GET' && url.pathname === '/api/cert/img') return await extra.certImage(res, q, send);
       if (!url.pathname.startsWith('/api/')) return serveStatic(res, url.pathname);
+      if (req.method === 'POST' && url.pathname === '/api/admin/upload') {
+        const me = await auth(req); // avval tekshiramiz, keyin faylni qabul qilamiz
+        if (!me.admin) throw new ApiError(403, 'forbidden', 'Faqat adminlar uchun');
+        const buf = await readRaw(req, 50 * 1024 * 1024);
+        const kind = ['video', 'photo', 'document'].includes(q.kind) ? q.kind : 'document';
+        return send(res, 200, await admin.upload(me, kind, String(q.name || 'fayl').slice(0, 200), buf));
+      }
       const handler = routes[`${req.method} ${url.pathname}`];
       if (!handler) return send(res, 404, { error: 'not_found' });
-      const body = req.method === 'POST' ? await readBody(req) : {};
+      const body = req.method === 'POST' ? await readBody(req, UPLOAD_ROUTES.has(url.pathname) ? 8 * 1024 * 1024 : 100 * 1024) : {};
       const me = await auth(req);
       return send(res, 200, await handler(me, q, body));
     } catch (e) {
@@ -371,7 +468,12 @@ function startServer(bot) {
       return send(res, 500, { error: 'Server xatosi', code: 'server' });
     }
   });
-  server.listen(config.PORT, () => console.log(`📱 Mini ilova serveri: http://localhost:${config.PORT}  (WEBAPP_URL=${config.WEBAPP_URL || 'berilmagan'})`));
+  // '::' — IPv4 va IPv6 (Railway ichki tarmog'i IPv6), bo'lmasa 0.0.0.0
+  server.on('error', (e) => {
+    if (e.code === 'EAFNOSUPPORT' || e.code === 'EADDRNOTAVAIL') server.listen(config.PORT, '0.0.0.0');
+    else console.error('[webapp] server xatosi:', e.message);
+  });
+  server.listen(config.PORT, '::', () => console.log(`📱 Mini ilova serveri: http://localhost:${config.PORT}  (WEBAPP_URL=${config.WEBAPP_URL || 'berilmagan'})`));
   return server;
 }
 

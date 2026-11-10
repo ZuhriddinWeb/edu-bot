@@ -65,6 +65,7 @@ async function render(ctx, key, edit) {
 
   const kb = Markup.inlineKeyboard([
     Object.entries(PERIODS).map(([k, v]) => Markup.button.callback(k === key ? `• ${v.name} •` : v.name, `rt:${k}`)),
+    [Markup.button.callback('🎓 Mening sertifikatlarim', 'cert_my')],
   ]);
   return edit ? safeEdit(ctx, text, { parse_mode: 'HTML', ...kb }) : ctx.reply(text, { parse_mode: 'HTML', ...kb });
 }

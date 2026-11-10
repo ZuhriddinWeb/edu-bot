@@ -86,6 +86,8 @@ async function charge(tgId, amount, type, note, extra) {
 
 // ---------- Kontentga ruxsat ----------
 const ITEM_TABLE = { variant: 'variants', topic: 'topics' };
+// Video yechim egasining jadvali (o'qituvchi testlari ham)
+const OWNER_TABLE = { variant: 'variants', topic: 'topics', tt: 'teacher_tests' };
 
 async function hasAccess(tgId, type, item) {
   if (!item.price || isAdmin(tgId)) return true;
@@ -149,6 +151,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 module.exports = {
   DAY, now, esc, money, fmtDate, isAdmin, getUser, parseAmount,
   allSettings, getSetting, getNum, setSetting, isOn, addBalance, charge,
-  ITEM_TABLE, hasAccess, purchasedIds, purchase, itemLabel,
+  ITEM_TABLE, OWNER_TABLE, hasAccess, purchasedIds, purchase, itemLabel,
   safeEdit, userHeader, textOf, sleep, fmtTime, mmss,
 };

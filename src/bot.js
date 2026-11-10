@@ -4,15 +4,17 @@ const { BTN, BTN_FEATURE, adminKb } = require('./keyboards');
 const { getUser, now, isAdmin, isOn } = require('./utils');
 const { showMainMenu } = require('./menu');
 const logger = require('./logger');
+const cleaner = require('./cleaner');
 
 // Inline tugmalar -> bo'lim (bo'lim o'chirilgan bo'lsa ishlamaydi)
 const CALLBACK_FEATURE = [
-  [/^(tc:|tc_back|tv:|tstart:|buy:variant:)/, 'tests'],
+  [/^(tc:|tc_back|tv:|tstart:|buy:variant:|tp_home|tpc:|tpd:|tpget:|buy:pdf:)/, 'tests'],
   [/^(vg:|vg_back|vt:|vq:|buy:topic:)/, 'videos'],
   [/^bk/, 'books'],
   [/^ce[_:]/, 'centers'],
   [/^(tt_|tti:|ttr:|ttq:|ttt:|ttd:|ttdd:|tts:)/, 'teacher'],
   [/^rt:/, 'rating'],
+  [/^cert_/, 'certs'],
   [/^bal_ref/, 'referral'],
   [/^bal_topup/, 'topup'],
 ];
@@ -30,6 +32,8 @@ function createBot(token) {
     if (!ctx.session) ctx.session = {};
     return next();
   });
+  // Yuborilgan menyu xabarlarini eslab qolish (keyin o'chirish uchun)
+  bot.use(cleaner.middleware());
 
   // Foydalanuvchini yuklash / birinchi marta kelganda yaratish (taklif havolasini ham saqlaydi)
   bot.use(async (ctx, next) => {
@@ -89,16 +93,21 @@ function createBot(token) {
   const states = {};
   // Menyu tugmasi bosilganda joriy holat (state) bekor qilinadi
   const menu = (text, fn) =>
-    bot.hears(text, (ctx) => {
+    bot.hears(text, async (ctx) => {
       ctx.session.state = null;
-      return fn(ctx);
+      await cleaner.cleanup(ctx); // oldingi menyu va bosilgan tugma o'chadi
+      await fn(ctx);
+      return require('./ads').maybeShow(ctx); // vaqti kelgan bo'lsa reklama
     });
 
   // O'chirilgan bo'limlar uchun to'siq (adminlarga ta'sir qilmaydi)
   bot.use(async (ctx, next) => {
     if (isAdmin(ctx.from.id)) return next();
     const text = ctx.message && ctx.message.text;
-    if (text && BTN_FEATURE[text] && !(await isOn(BTN_FEATURE[text]))) return showMainMenu(ctx, OFF_TEXT);
+    if (text && BTN_FEATURE[text] && !(await isOn(BTN_FEATURE[text]))) {
+      await cleaner.cleanup(ctx);
+      return showMainMenu(ctx, OFF_TEXT);
+    }
     const data = ctx.callbackQuery && ctx.callbackQuery.data;
     if (data) {
       const hit = CALLBACK_FEATURE.find(([re]) => re.test(data));
@@ -107,7 +116,8 @@ function createBot(token) {
     return next();
   });
 
-  bot.hears(BTN.CANCEL, (ctx) => {
+  bot.hears(BTN.CANCEL, async (ctx) => {
+    await cleaner.cleanup(ctx);
     const st = ctx.session.state || '';
     const adminFlow = st.startsWith('adm_') || (ctx.session.qw && ctx.session.qw.back === 'admin');
     ctx.session.state = null;
@@ -123,17 +133,33 @@ function createBot(token) {
   require('./handlers/tests').register(deps);
   require('./handlers/videos').register(deps);
   require('./handlers/balance').register(deps);
+  require('./handlers/topups').register(deps);
   require('./handlers/books').register(deps);
   require('./handlers/centers').register(deps);
   require('./handlers/support').register(deps);
   require('./handlers/teacher').register(deps);
   require('./handlers/rating').register(deps);
+  require('./handlers/certs').register(deps);
+
+  // 📱 Mini ilova — inline web_app tugmasi (initData bilan ochiladi)
+  menu(BTN.WEBAPP, (ctx) => {
+    const { WEBAPP_URL } = require('./config');
+    const { Markup } = require('telegraf');
+    if (!WEBAPP_URL) return showMainMenu(ctx, "📱 Mini ilova hozircha sozlanmagan.");
+    return ctx.reply("📱 Mini ilovani ochish uchun pastdagi tugmani bosing.\n\nYoki chat pastidagi chap burchakdagi «📱 Ilova» tugmasidan ham ochish mumkin.",
+      Markup.inlineKeyboard([[Markup.button.webApp('📱 Mini ilovani ochish', WEBAPP_URL)]]));
+  });
   require('./handlers/admin').register(deps);
+  require('./handlers/adminAds').register(deps);
 
   // Holatga qarab xabarni yo'naltirish
-  bot.on('message', (ctx) => {
+  bot.on('message', async (ctx) => {
     const st = ctx.session.state;
-    if (st && states[st]) return states[st](ctx);
+    if (st && states[st]) {
+      cleaner.remember(ctx, ctx.message.message_id); // foydalanuvchi javobi ham keyin o'chadi
+      return states[st](ctx);
+    }
+    await cleaner.cleanup(ctx);
     return showMainMenu(ctx);
   });
 

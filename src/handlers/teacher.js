@@ -169,11 +169,14 @@ function register({ bot, menu, states, deepLinks }) {
     if (!t) return safeEdit(ctx, 'Test topilmadi.');
     const n = await qCount(id);
     const solved = Number((await db('results').where({ owner_type: 'tt', owner_id: id }).count({ c: '*' }))[0].c);
-    const text = `📝 <b>${esc(t.title)}</b>\n📅 ${fmtDate(t.created_at)}\n⏱ Vaqt: ${t.time_limit ? `${t.time_limit} daqiqa` : 'cheklanmagan'}\n❓ Savollar: ${n}\n👥 Yechganlar: ${solved}\n${t.is_open ? '🟢 Ochiq' : '🔒 Yopiq'}\n\n🔗 <code>${link(ctx, t)}</code>`;
+    const text = `📝 <b>${esc(t.title)}</b>\n📅 ${fmtDate(t.created_at)}\n⏱ Vaqt: ${t.time_limit ? `${t.time_limit} daqiqa` : 'cheklanmagan'}\n❓ Savollar: ${n}\n🎥 Video yechim: ${t.sol_ref ? 'bor ✅' : "yo'q"}\n👥 Yechganlar: ${solved}\n${t.is_open ? '🟢 Ochiq' : '🔒 Yopiq'}\n\n🔗 <code>${link(ctx, t)}</code>`;
     return safeEdit(ctx, text, {
       parse_mode: 'HTML',
       ...shareKb(ctx, t, [
         [Markup.button.callback('📊 Natijalar', `ttr:${id}`), Markup.button.callback("➕ Savol qo'shish", `ttq:${id}`)],
+        t.sol_ref
+          ? [Markup.button.callback('🎥 Yechimni almashtirish', `qws:tt:${id}`), Markup.button.callback('🗑 Yechim', `qwsd:tt:${id}`)]
+          : [Markup.button.callback("🎥 Video yechim qo'shish", `qws:tt:${id}`)],
         [Markup.button.callback(t.is_open ? '🔒 Yopish' : '🟢 Ochish', `ttt:${id}`), Markup.button.callback("🗑 O'chirish", `ttd:${id}`)],
         [Markup.button.callback('⬅️ Testlarim', 'tt_list')],
       ]),
@@ -235,4 +238,4 @@ function register({ bot, menu, states, deepLinks }) {
   });
 }
 
-module.exports = { register, openPending, openByCode, notifyTeacher };
+module.exports = { register, openPending, openByCode, notifyTeacher, newCode, getTest };

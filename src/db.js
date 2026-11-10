@@ -9,13 +9,34 @@ function makeKnex() {
   if (isMysql) {
     return knex({
       client: 'mysql2',
-      connection: { ...config.MYSQL, charset: 'utf8mb4' },
+      connection: {
+        ...config.MYSQL,
+        charset: 'utf8mb4',
+        supportBigNumbers: true, // Telegram ID lar (BIGINT) to'g'ri o'qilishi uchun
+        decimalNumbers: true, // SUM() natijalari raqam bo'lib qaytsin
+        connectTimeout: 20000,
+      },
       pool: { min: 0, max: 10 },
     });
   }
   const file = path.resolve(config.SQLITE_FILE);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   return knex({ client: 'better-sqlite3', connection: { filename: file }, useNullAsDefault: true });
+}
+
+// Baza tayyor bo'lguncha kutish (Railway'da MySQL botdan keyin ishga tushishi mumkin)
+async function waitForDb(tries = 15, delayMs = 4000) {
+  for (let i = 1; i <= tries; i += 1) {
+    try {
+      await db.raw('select 1');
+      return;
+    } catch (e) {
+      const where = isMysql ? `${config.MYSQL.host}:${config.MYSQL.port}/${config.MYSQL.database}` : config.SQLITE_FILE;
+      console.error(`[db] ulanib bo'lmadi (${i}/${tries}) ${where}: ${e.code || ''} ${e.message}`);
+      if (i === tries) throw e;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
 }
 
 const db = makeKnex();
@@ -153,6 +174,47 @@ async function migrate() {
     t.unique(['section', 'code']);
   });
 
+  // Reklamalar (admin joylaydi, muddati bilan)
+  await createIfMissing('ads', (t) => {
+    t.increments('id');
+    t.text('text');
+    t.string('media_type', 10); // photo | video | null
+    t.string('media_id', 255);
+    t.string('btn_text', 64);
+    t.string('btn_url', 500);
+    t.bigInteger('starts_at').notNullable();
+    t.bigInteger('ends_at').notNullable().index();
+    t.integer('is_active').notNullable().defaultTo(1);
+    t.integer('shows').notNullable().defaultTo(0);
+    t.bigInteger('created_at');
+  });
+
+  // Balansni to'ldirish so'rovlari (admin tasdiqlaydi yoki rad etadi)
+  await createIfMissing('topups', (t) => {
+    t.increments('id');
+    t.bigInteger('user_tg').notNullable().index();
+    t.integer('amount').notNullable();
+    t.string('status', 10).notNullable().defaultTo('pending'); // pending | approved | rejected
+    t.string('reason', 500);
+    t.bigInteger('admin_tg');
+    t.text('admin_msgs'); // [[chatId, msgId], ...]
+    t.bigInteger('created_at');
+    t.bigInteger('decided_at');
+  });
+
+  // Berilgan sertifikatlar (har bir test/mavzu uchun bittadan; yaxshiroq natijada yangilanadi)
+  await createIfMissing('certificates', (t) => {
+    t.increments('id');
+    t.bigInteger('user_tg').notNullable().index();
+    t.string('owner_type', 10).notNullable();
+    t.integer('owner_id').notNullable();
+    t.string('title', 255).notNullable();
+    t.integer('correct').notNullable();
+    t.integer('total').notNullable();
+    t.bigInteger('created_at');
+    t.unique(['user_tg', 'owner_type', 'owner_id']);
+  });
+
   // Mini ilovadagi test urinishlari (vaqt nazorati server tomonda)
   await createIfMissing('quiz_attempts', (t) => {
     t.increments('id');
@@ -184,11 +246,22 @@ async function migrate() {
   // Oldingi versiyadan yangilanganlar uchun yangi ustunlar
   await addColumn('users', 'is_blocked', (t) => t.integer('is_blocked').notNullable().defaultTo(0));
   await addColumn('users', 'last_seen', (t) => t.bigInteger('last_seen'));
+  // Butun test uchun bitta video yechim (har savolga alohida emas)
+  for (const tbl of ['variants', 'topics', 'teacher_tests']) {
+    await addColumn(tbl, 'sol_type', (t) => t.string('sol_type', 10));
+    await addColumn(tbl, 'sol_ref', (t) => t.text('sol_ref'));
+  }
+  await addColumn('topups', 'receipt_id', (t) => t.string('receipt_id', 255));
+  await addColumn('users', 'last_ad_at', (t) => t.bigInteger('last_ad_at'));
   await addColumn('questions', 'photo_id', (t) => t.string('photo_id', 255));
   await addColumn('questions', 'sol_type', (t) => t.string('sol_type', 10)); // video | document | url
   await addColumn('questions', 'sol_ref', (t) => t.text('sol_ref'));
   await addColumn('variants', 'time_limit', (t) => t.integer('time_limit').notNullable().defaultTo(0)); // daqiqa
   await addColumn('topics', 'time_limit', (t) => t.integer('time_limit').notNullable().defaultTo(0));
+  // Testning elektron varianti (PDF) — alohida sotiladi
+  await addColumn('variants', 'pdf_id', (t) => t.string('pdf_id', 255));
+  await addColumn('variants', 'pdf_name', (t) => t.string('pdf_name', 255));
+  await addColumn('variants', 'pdf_price', (t) => t.integer('pdf_price').notNullable().defaultTo(0));
   await addColumn('teacher_tests', 'time_limit', (t) => t.integer('time_limit').notNullable().defaultTo(0));
 }
 
@@ -198,4 +271,4 @@ async function addColumn(table, column, build) {
   console.log(`[db] ustun qo'shildi: ${table}.${column}`);
 }
 
-module.exports = { db, migrate };
+module.exports = { db, migrate, waitForDb, isMysql };

@@ -17,6 +17,8 @@ const BTN = {
   SKIP: "⏭ O'tkazib yuborish",
   DONE: '✅ Tayyor',
   OPT_DONE: '✅ Variantlar tayyor',
+  UNDO: "↩️ Oxirgi savolni o'chirish",
+  HELP: "❓ Yo'riqnoma",
 
   A_STATS: '📊 Statistika',
   A_USERS: '👥 Foydalanuvchilar',
@@ -26,6 +28,8 @@ const BTN = {
   A_PRICES: '💵 Narxlar',
   A_FEATURES: "🎛 Bo'limlar",
   A_CATS: '📂 Sinflar',
+  A_ADS: '📣 Reklama',
+  A_LISTINGS: "📋 E'lonlar",
   A_BROADCAST: '📢 Xabar yuborish',
   A_EXIT: '⬅️ Asosiy menyu',
 };
@@ -39,6 +43,7 @@ const BTN_FEATURE = {
   [BTN.TEACHER]: 'teacher',
   [BTN.RATING]: 'rating',
   [BTN.SUPPORT]: 'support',
+  [BTN.WEBAPP]: 'webapp',
 };
 
 // on — { tests: true, ... }
@@ -52,7 +57,9 @@ const mainKb = (admin, on = {}) => {
     [BTN.TEACHER, BTN.RATING],
     [BTN.SUPPORT],
   ].map((r) => r.filter(show)).filter((r) => r.length);
-  if (config.WEBAPP_URL && (admin || on.webapp !== false)) rows.unshift([Markup.button.webApp(BTN.WEBAPP, config.WEBAPP_URL)]);
+  // Diqqat: pastki menyudagi web_app tugma ilovaga foydalanuvchi ma'lumotini (initData) bermaydi,
+  // shuning uchun bu oddiy tugma — bosilganda xabar ichidagi (inline) «Ochish» tugmasi yuboriladi.
+  if (config.WEBAPP_URL && (admin || on.webapp !== false)) rows.unshift([BTN.WEBAPP]);
   if (admin) rows.push([BTN.ADMIN]);
   return Markup.keyboard(rows).resize();
 };
@@ -61,8 +68,9 @@ const adminKb = () =>
   Markup.keyboard([
     [BTN.A_STATS, BTN.A_USERS],
     [BTN.A_TEST, BTN.A_VIDEO],
-    [BTN.A_CONTENT, BTN.A_PRICES],
-    [BTN.A_CATS, BTN.A_FEATURES],
+    [BTN.A_CONTENT, BTN.A_CATS],
+    [BTN.A_ADS, BTN.A_LISTINGS],
+    [BTN.A_PRICES, BTN.A_FEATURES],
     [BTN.A_BROADCAST, BTN.A_EXIT],
   ]).resize();
 

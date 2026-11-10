@@ -45,15 +45,30 @@ const regStates = {
     if (!phone) return ctx.reply("Raqam noto'g'ri. Tugmani bosing yoki +998901234567 ko'rinishida yozing.");
 
     const f = ctx.session.form || {};
-    await db('users').where({ tg_id: ctx.from.id }).update({
+    // Faqat hali ro'yxatdan o'tmagan bo'lsa yangilanadi — bonuslar takror berilmasligi uchun
+    const changed = await db('users').where({ tg_id: ctx.from.id, is_registered: 0 }).update({
       first_name: f.first_name, last_name: f.last_name, phone, is_registered: 1,
     });
+    if (!changed) {
+      ctx.session.state = null;
+      ctx.session.form = null;
+      return showMainMenu(ctx);
+    }
     ctx.session.state = null;
     ctx.session.form = null;
 
     // Taklif qilgan do'stga bonus
     const u = await getUser(ctx.from.id);
     log(ctx.from.id, `✅ Ro'yxatdan o'tdi${u.referrer_id ? ` (taklif qilgan: ${u.referrer_id})` : ''}`);
+    // Start bonusi — faqat to'liq ro'yxatdan o'tgach (kanal obunasi + ism + familiya + telefon), bir marta.
+    // Bazadagi 'welcome' yozuvi bilan solishtiriladi; summani admin belgilaydi, 0 — berilmaydi
+    let welcome = '';
+    const startBonus = await getNum('start_bonus');
+    if (startBonus > 0 && !(await db('transactions').where({ user_tg: u.tg_id, type: 'welcome' }).first())) {
+      await addBalance(u.tg_id, startBonus, 'welcome', "Ro'yxatdan o'tish bonusi");
+      log(u.tg_id, `🎁 Start bonusi: +${money(startBonus)}`);
+      welcome = `\n🎁 Sizga sovg'a: balansingizga <b>${money(startBonus)}</b> qo'shildi!`;
+    }
     // Bonus faqat kanalga a'zo bo'lib ro'yxatdan o'tgandan keyin beriladi (obuna tekshiruvi bu bosqichdan oldin)
     if (u.referrer_id && (await isOn('referral'))) {
       const bonus = await getNum('referral_bonus');
@@ -65,7 +80,7 @@ const regStates = {
           .catch(() => {});
       }
     }
-    await showMainMenu(ctx, "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!");
+    await showMainMenu(ctx, `✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!${welcome}`);
     return require('./teacher').openPending(ctx);
   },
 };
@@ -73,6 +88,7 @@ const regStates = {
 function register({ bot, deepLinks }) {
   bot.start(async (ctx) => {
     ctx.session.state = null;
+    await require('../cleaner').cleanup(ctx);
     if (!ctx.user.is_registered) return beginRegistration(ctx);
     if (await require('./teacher').openPending(ctx)) return null;
     // Mini ilovadan kelgan buyruqlar (/start topup, /start addbook ...)

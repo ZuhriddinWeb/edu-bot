@@ -24,37 +24,54 @@ Node.js 18+ kerak. Jadvallar va yangi ustunlar ishga tushganda avtomatik yaratil
 | Bo'lim | Nima qiladi |
 |--------|-------------|
 | Asosiy menyu | Tepada ism-familiya, telefon, ID, balans |
-| 📝 Test ishlash | Sinf bo'limlari (standart: 1, 2, 3, 4, 5-sinf, 6-7-sinf, maxsus maktablar) → variantlar → vaqtli test → natija + 🎥 video yechimlar |
+| 📝 Test ishlash | «📄 Elektron variantlar (PDF)» — testlarning PDF faylini alohida sotib olish. Sinf bo'limlari (standart: 1, 2, 3, 4, 5-sinf, 6-7-sinf, maxsus maktablar) → variantlar → vaqtli test → natija + 🎥 video yechimlar |
 | 🎬 Videodarslar (onlayn dars) | Sinf bo'limlari (standart: 1-2, 3-4, 5-7-sinf, maxsus maktablar) → mavzu → video → takrorlash testi |
 | 💰 Balans | Balans, do'st taklif qilish (bonus), chek orqali to'ldirish, tarix |
 | 📚 Kitoblar | Qidiruv, sotuvdagilar, kitob qo'shish (pullik, 1 oy) |
 | 🏫 O'quv markaz / maktab | Viloyat → tuman → ro'yxat (nomi, tel, lokatsiya); qo'shish pullik, 1 oy |
 | 👨‍🏫 O'qituvchilar uchun | Test tuzish (bittalab) → havola → o'quvchilar yechadi → natijalar o'qituvchiga |
+| 🎓 Sertifikat | Test yoki videodars testini belgilangan foizdan (standart 80%) yuqori yechganga avtomatik: ism-familiya, mavzu, natija, sana, imzo. «🎓 Mening sertifikatlarim» — qayta olish, chop etish uchun asl sifatli fayl |
 | 🏆 Reyting | Eng faol o'quvchilar: hafta / oy / umumiy |
 | ☎️ Admin bilan bog'lanish | Xabar adminga, admin javob qaytaradi |
 | 📱 Mini ilova | Yuqoridagilarning foydalanuvchi qismi chiroyli ilovada |
 
-## Admin panel (botda: «🛠 Admin panel» yoki /admin)
+## Admin panel
+
+Admin panel **Mini ilovada** (pastki paneldagi «Admin» yoki bosh sahifadagi «Admin panel») va **botda** («🛠 Admin panel» yoki /admin) — ikkalasi bir xil ishlaydi.
+Mini ilovada video va PDF fayllarni ham to'g'ridan-to'g'ri yuklash mumkin (50 MB gacha — Telegram cheklovi). To'lov so'rovlarida chek rasmi ko'rinadi.
+
+### Botdagi admin panel
 
 - **📊 Statistika** — foydalanuvchilar, faollik, kontent, to'lovlar.
 - **👥 Foydalanuvchilar** — ID, telefon yoki ism bo'yicha qidirish; kartochkada: balansni o'zgartirish, xabar yozish, amallar tarixi, test natijalari, **🚫 bloklash / blokdan chiqarish**.
-- **➕ Test varianti** — bo'lim → nom → narx → **vaqt (daqiqa)** → savollarni bittalab kiritish.
+- **➕ Test varianti** — bo'lim → nom → narx → **vaqt (daqiqa)** → **PDF (elektron variant) va uning narxi** (ixtiyoriy) → savollarni bittalab kiritish.
+  PDFni keyin «🗂 Kontent» dan yuklash, almashtirish, narxini o'zgartirish yoki olib tashlash mumkin.
 - **➕ Video mavzu** — bo'lim → nom → tavsif → narx → takrorlash testi vaqti → video → takrorlash testi savollari.
 - **📂 Sinflar** — testlar va onlayn darslar uchun sinf bo'limlarini boshqarish: yangi bo'lim qo'shish
   (alohida — «5-sinf», birgalikda — «6-7-sinf»), nomini o'zgartirish, tartibini o'zgartirish (⬆️⬇️), yashirish, o'chirish
   (bo'sh bo'lsa). Test yoki mavzu qo'shganda shu bo'limlardan biri tanlanadi.
 - **🗂 Kontent** — «📂 Bo'limini o'zgartirish» bilan test/mavzuni boshqa sinf bo'limiga ko'chirish; har bir test/mavzu uchun: savol qo'shish, savollar ro'yxati (bittalab o'chirish), narx, vaqt, videoni almashtirish, yashirish/ko'rsatish, o'chirish.
-- **💵 Narxlar** — barcha narxlar tugma bilan o'zgaradi.
+- **💳 To'ldirish so'rovlari** — foydalanuvchi summani (kamida `min_topup`, standart 20 000) kiritib chek yuboradi.
+  Adminga: «✅ Tasdiqlash», «✏️ Boshqa summa bilan», «❌ Rad etish» (6 ta tayyor sabab yoki o'zi yozadi). Sabab foydalanuvchiga yuboriladi.
+  Bir nechta admin bo'lsa ham so'rov faqat bir marta ko'rib chiqiladi. «📊 Statistika» → «⏳ Kutilayotgan to'lovlar».
+- **📣 Reklama** — matn / rasm / video + ixtiyoriy tugma (`Matn | https://havola`), muddati (kun). Muddat tugagach o'zi to'xtaydi.
+  Har bir reklama: ko'rib chiqish, muddatni o'zgartirish, to'xtatish/yoqish, «📢 hozir hammaga yuborish», o'chirish, necha marta ko'rsatilgani.
+  Foydalanuvchiga menyu ochganda ko'rsatiladi — bir odamga `ad_interval_hours` soatda bir martadan ko'p emas. Mini ilova bosh sahifasida banner.
+- **📋 E'lonlar** — foydalanuvchilar joylagan kitob va markaz e'lonlari (faol / muddati tugagan): muddatni o'zgartirish, o'chirish.
+  Admin o'zi joylagan e'lonlar bepul.
+- **💵 Narxlar** — barcha narxlar va muddatlar tugma bilan o'zgaradi.
 - **🎛 Bo'limlar** — har bir bo'limni yoqish/o'chirish (o'chirilgani foydalanuvchilarga ko'rinmaydi). «🤖 Bot» o'chirilsa — texnik ishlar rejimi (faqat adminlar ishlata oladi).
 - **📢 Xabar yuborish** — barcha foydalanuvchilarga.
 
-### Savolni bittalab kiritish (admin va o'qituvchi)
+### Savolni kiritish (admin va o'qituvchi)
 
-1. Savol matni — yoki **rasm + izoh** (rasmli savol).
-2. A, B, C... variantlar (2–6 ta), keyin «✅ Variantlar tayyor».
-3. To'g'ri javob tugmasini bosish.
-4. **🎥 Video yechim** — video fayl yoki havola (ixtiyoriy, «⏭ O'tkazib yuborish»).
-5. Saqlangach darhol keyingi savol so'raladi. Tugatish — «✅ Tayyor».
+Boshida bot yo'riqnomani misollar bilan ko'rsatadi, har qadamda nima yozish kerakligini aytadi («❓ Yo'riqnoma» — qayta ko'rish):
+
+1. **Savol matni** — yoki **rasm + izoh** (rasmli savol).
+2. **Variantlar** — eng qulayi bitta xabarda, har birini yangi qatordan (bot o'zi A, B, C... qiladi). Bittalab ham bo'ladi.
+3. **To'g'ri javob** — tugmani bosish yoki harfni yozish.
+4. **🎥 Video yechim** — video yoki havola (ixtiyoriy).
+5. Saqlangach keyingi savol so'raladi. Xato bo'lsa — «↩️ Oxirgi savolni o'chirish». Tugatish — «✅ Tayyor».
 
 Video yechimlar o'quvchiga test **tugagandan keyin** «🎥 Video yechimlar» tugmasi orqali ko'rinadi.
 
@@ -64,10 +81,23 @@ Video yechimlar o'quvchiga test **tugagandan keyin** «🎥 Video yechimlar» tu
 |---------|----------|
 | Test varianti | 5 000 so'm (har variantga alohida narx qo'yiladi) |
 | Video mavzu | 5 000 so'm |
-| Kitob e'loni | 30 000 so'm / 30 kun |
-| O'quv markaz/maktab e'loni | 30 000 so'm / 30 kun |
+| Kitob e'loni | 30 000 so'm / 30 kun (narx va muddat alohida) |
+| O'quv markaz/maktab e'loni | 30 000 so'm / 30 kun (narx va muddat alohida) |
+| Testning PDF varianti | 5 000 so'm (har biriga alohida narx) |
+| Start bonusi (to'liq ro'yxatdan o'tgach, bir marta) | 10 000 so'm (0 — berilmaydi) |
+| Reklama ko'rsatish oralig'i | 12 soat |
+| Minimal to'ldirish summasi | 20 000 so'm |
+| Sertifikat uchun minimal natija | 80% |
+| Sertifikatdagi imzo | Behruz Halimov |
 | Do'st taklif bonusi | 5 000 so'm (do'st kanalga a'zo bo'lib ro'yxatdan o'tgach) |
 | O'qituvchi test tuzishi | 0 (bepul) |
+
+## Chatni tozalash
+
+Foydalanuvchi yangi menyu tugmasini bosganda oldingi menyu xabarlari, bosilgan tugma xabari va forma
+davomida yozilgan javoblar avtomatik o'chiriladi — chatda faqat joriy bo'lim qoladi.
+O'chmaydi: test savollari va natijalari, video darslar, video yechimlar, admin yuborgan bildirishnomalar.
+Telegram 48 soatdan eski xabarlarni o'chirishga ruxsat bermaydi. Admin «🎛 Bo'limlar» → «🧹 Chatni tozalash» orqali o'chirib qo'yishi mumkin.
 
 ## Loglar (maxfiy kanal)
 
@@ -99,18 +129,28 @@ Mini ilova shu botning o'zida ishlaydi (`PORT` da HTTP server). Telegram mini il
 
 **Lokalda sinash uchun:** `ngrok http 3000` → bergan https manzilni `WEBAPP_URL` ga yozing.
 
-Mini ilovada: profil va balans, testlar (vaqt hisoblagich bilan), videodarslar, natija va video yechimlar,
-reyting, balans/taklif havolasi, kitoblar, o'quv markazlar. Rasm/video yuklash talab qiladigan amallar
-(kitob/markaz qo'shish, chek yuborish, o'qituvchi testi tuzish) botga yo'naltiriladi.
+Mini ilovada botdagi barcha foydalanuvchi imkoniyatlari bor:
+- profil, balans, taklif havolasi, amallar tarixi, **balansni chek rasmi bilan to'ldirish**;
+- testlar (vaqt hisoblagich bilan), videodarslar, natija va video yechimlar, **PDF variantlar**, **sertifikatlar**;
+- reyting; kitoblar va o'quv markazlar (qidirish, **qo'shish**, **«Mening e'lonlarim»** — uzaytirish/o'chirish);
+- **o'qituvchilar**: test tuzish, savollarni forma orqali kiritish (rasmli savol, video yechim havolasi), natijalar, testni yopish/o'chirish;
+- **o'qituvchi testini kod yoki havola bilan yechish** (bir marta, javoblar ko'rsatilmaydi, natija o'qituvchiga boradi);
+- **admin bilan bog'lanish** (matn va rasm).
+Admin paneli faqat botda.
 Telegram videolari bot orqali chatga yuboriladi (himoyalangan holda).
 
 Xavfsizlik: har bir so'rov Telegram `initData` imzosi bilan tekshiriladi; bloklangan, ro'yxatdan o'tmagan
 yoki kanalga obuna bo'lmaganlar kira olmaydi; test vaqti server tomonda nazorat qilinadi.
 
+## Railway'ga joylash
+
+Batafsil: **RAILWAY.md** (MySQL ulash, domen, eski SQLite ma'lumotlarni ko'chirish).
+
 ## Serverga (MySQL) o'tkazish
 
 1. `CREATE DATABASE edu_bot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-2. `.env`: `DB_CLIENT=mysql` va `MYSQL_*`.
+2. `.env`: `MYSQL_URL=mysql://user:parol@host:3306/edu_bot` (yoki `MYSQLHOST`, `MYSQLUSER`...). Bot o'zi MySQL ga o'tadi.
+   Eski SQLite ma'lumotlarni ko'chirish: `npm run migrate-sqlite -- data/bot.sqlite`.
 3. Doimiy ishlashi uchun: `npm i -g pm2 && pm2 start src/index.js --name edu-bot && pm2 save`
 
 ## Tuzilma

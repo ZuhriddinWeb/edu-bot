@@ -2,7 +2,7 @@
 const { Markup } = require('telegraf');
 const { db } = require('../db');
 const { BTN, cancelKb, skipKb } = require('../keyboards');
-const { esc, money, fmtDate, now, DAY, getNum, getUser, charge, textOf, safeEdit } = require('../utils');
+const { esc, money, fmtDate, now, DAY, getNum, getUser, charge, textOf, safeEdit, isAdmin } = require('../utils');
 const { showMainMenu } = require('../menu');
 const { registerMine } = require('../listings');
 const { log } = require('../logger');
@@ -41,8 +41,8 @@ async function showPage(ctx, page) {
 function register({ bot, menu, states, deepLinks }) {
   const home = async (ctx, edit) => {
     ctx.session.state = null;
-    const price = await getNum('book_price');
-    const days = await getNum('listing_days');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('book_price'); // admin uchun bepul
+    const days = await getNum('book_days');
     return (edit ? safeEdit : (c, t, e) => c.reply(t, e))(ctx,
       `📚 <b>Kitoblar</b>\n\nKitob nomi yoki muallif bo'yicha qidiring, sotuvdagi kitoblarni ko'ring yoki o'z kitobingizni sotuvga qo'ying.\n\nℹ️ Kitob qo'shish: ${money(price)} / ${days} kun`,
       {
@@ -98,7 +98,7 @@ function register({ bot, menu, states, deepLinks }) {
 
   // --- Kitob qo'shish ---
   const addStart = async (ctx) => {
-    const price = await getNum('book_price');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('book_price'); // admin uchun bepul
     const u = await getUser(ctx.from.id);
     if (u.balance < price) {
       return ctx.reply(`⚠️ Kitob qo'shish narxi ${money(price)}. Balansingiz: ${money(u.balance)}.\n«💰 Balans» bo'limidan to'ldiring.`);
@@ -160,8 +160,8 @@ function register({ bot, menu, states, deepLinks }) {
     else if (textOf(ctx) !== BTN.SKIP) return ctx.reply(`Rasm yuboring yoki «${BTN.SKIP}» ni bosing.`);
     ctx.session.state = null;
     const f = ctx.session.form;
-    const price = await getNum('book_price');
-    const days = await getNum('listing_days');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('book_price'); // admin uchun bepul
+    const days = await getNum('book_days');
     await ctx.reply('👇 E\'lon ko\'rinishi:', Markup.removeKeyboard());
     const kb = Markup.inlineKeyboard([
       [Markup.button.callback(`✅ Joylash — ${money(price)} (${days} kun)`, 'bk_confirm')],
@@ -181,8 +181,8 @@ function register({ bot, menu, states, deepLinks }) {
   bot.action('bk_confirm', async (ctx) => {
     const f = ctx.session.form;
     if (!f || !f.title || !f.phone) return ctx.answerCbQuery("Ma'lumotlar eskirgan, qaytadan qo'shing", { show_alert: true });
-    const price = await getNum('book_price');
-    const days = await getNum('listing_days');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('book_price'); // admin uchun bepul
+    const days = await getNum('book_days');
     const expires = now() + days * DAY;
     const res = await charge(ctx.from.id, price, 'book', `Kitob: ${f.title}`, async (trx) => {
       await trx('books').insert({ ...f, user_tg: ctx.from.id, is_active: 1, expires_at: expires, created_at: now() });
@@ -195,7 +195,7 @@ function register({ bot, menu, states, deepLinks }) {
     return showMainMenu(ctx, `✅ Kitobingiz sotuvga qo'yildi! ${fmtDate(expires)} gacha ko'rinib turadi.`);
   });
 
-  registerMine(bot, { home: 'bk_home', table: 'books', p: 'bk', priceKey: 'book_price', txType: 'book', title: (r) => r.title });
+  registerMine(bot, { home: 'bk_home', table: 'books', p: 'bk', priceKey: 'book_price', daysKey: 'book_days', txType: 'book', title: (r) => r.title });
 }
 
 module.exports = { register };

@@ -17,7 +17,7 @@ const catName = (code) => cats.name('test', code);
 const grpName = (code) => cats.name('video', code);
 const cnt = async (q) => Number((await q.count({ c: '*' }))[0].c);
 const timeKb = () => Markup.keyboard([['0', '10', '15'], ['20', '30', '45'], ['60', '90'], [BTN.CANCEL]]).resize();
-const TX_NAMES = { referral: '👥 Taklif', admin: '💳 Admin', purchase: '🛒 Xarid', book: '📚 Kitob', center: '🏫 Markaz', teacher: "👨‍🏫 O'qituvchi" };
+const TX_NAMES = { referral: '👥 Taklif', welcome: '🎁 Start bonusi', admin: '💳 Admin', purchase: '🛒 Xarid', book: '📚 Kitob', center: '🏫 Markaz', teacher: "👨‍🏫 O'qituvchi" };
 
 function register({ bot, menu, states }) {
   const adminMenu = (text, fn) => menu(text, (ctx) => (isAdmin(ctx.from.id) ? fn(ctx) : showMainMenu(ctx)));
@@ -27,13 +27,21 @@ function register({ bot, menu, states }) {
     states[name] = (ctx) => (isAdmin(ctx.from.id) ? fn(ctx) : showMainMenu(ctx));
   };
 
-  const openPanel = (ctx, text = '🛠 <b>Admin panel</b>') => {
+  const VERSION = require('../../package.json').version;
+  const openPanel = (ctx, text = "🛠 <b>Admin panel</b>") => {
     ctx.session.state = null;
     return ctx.reply(text, { parse_mode: 'HTML', ...adminKb() });
   };
 
   adminMenu(BTN.ADMIN, (ctx) => openPanel(ctx));
   bot.command('admin', (ctx) => (isAdmin(ctx.from.id) ? openPanel(ctx) : null));
+  bot.command('version', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return null;
+    const cfg = require('../config');
+    const dbInfo = cfg.DB_CLIENT === 'mysql' ? `MySQL (${cfg.MYSQL.host}/${cfg.MYSQL.database})` : `SQLite (${cfg.SQLITE_FILE})${cfg.ON_RAILWAY ? " ⚠️ Railway'da ma'lumotlar o'chadi!" : ''}`;
+    const users = await cnt(db('users'));
+    return ctx.reply(`🤖 Bot versiyasi: v${VERSION}\n🗄 Baza: ${dbInfo}\n👥 Foydalanuvchilar: ${users}\n📱 Mini ilova: ${cfg.WEBAPP_URL || "sozlanmagan"}\n📁 Papka: ${process.cwd()}`);
+  });
   adminMenu(BTN.A_EXIT, (ctx) => showMainMenu(ctx));
 
   wizard.onDone.admin = (ctx, { count }) => openPanel(ctx, `✅ Saqlandi. Jami savollar: <b>${count}</b>\n\nTahrirlash: «${BTN.A_CONTENT}»`);
@@ -61,13 +69,17 @@ function register({ bot, menu, states }) {
     const topups = await sum(db('transactions').where('type', 'admin').andWhere('amount', '>', 0));
     const spent = -(await sum(db('transactions').where('amount', '<', 0)));
     const bonus = await sum(db('transactions').where('type', 'referral'));
+    const welcome = await sum(db('transactions').where('type', 'welcome'));
+    const ads = await cnt(require('../ads').activeQuery());
+    const pendingTopups = await cnt(db('topups').where({ status: 'pending' }));
+    const certsCount = await cnt(db('certificates'));
     const bal = Number((await db('users').sum({ s: 'balance' }))[0].s) || 0;
     return ctx.reply(
       `📊 <b>Statistika</b>\n\n👥 Foydalanuvchilar: ${users}\n✅ Ro'yxatdan o'tgan: ${regs}\n🆕 Oxirgi 24 soatda qo'shilgan: ${today}\n🟢 Oxirgi 24 soatda faol: ${active}\n🚫 Bloklangan: ${blocked}\n🤝 Taklif orqali kelgan: ${refs}\n\n` +
       `📝 Test variantlari: ${vars}\n🎬 Video mavzular: ${tops}\n👨‍🏫 O'qituvchi testlari: ${tts}\n❓ Jami savollar: ${qs}\n🧮 24 soatda yechilgan testlar: ${tests24}\n🛒 Xaridlar: ${buys}\n\n` +
-      `📚 Faol kitob e'lonlari: ${books}\n🏫 Faol markaz/maktab e'lonlari: ${centers}\n\n` +
-      `💳 Admin to'ldirgan: ${money(topups)}\n🎁 Taklif bonuslari: ${money(bonus)}\n💸 Sarflangan: ${money(spent)}\n💰 Foydalanuvchilar balansi: ${money(bal)}`,
-      { parse_mode: 'HTML' },
+      `📚 Faol kitob e'lonlari: ${books}\n🏫 Faol markaz/maktab e'lonlari: ${centers}\n📣 Faol reklamalar: ${ads}\n🎓 Berilgan sertifikatlar: ${certsCount}\n\n` +
+      `💳 Admin to'ldirgan: ${money(topups)}\n🎁 Taklif bonuslari: ${money(bonus)}\n🎉 Start bonuslari: ${money(welcome)}\n💸 Sarflangan: ${money(spent)}\n💰 Foydalanuvchilar balansi: ${money(bal)}\n⏳ Kutilayotgan to'ldirish so'rovlari: ${pendingTopups}`,
+      { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback(`⏳ Kutilayotgan to'lovlar (${pendingTopups})`, 'tu_list')]]) },
     );
   });
 
@@ -268,13 +280,55 @@ function register({ bot, menu, states }) {
   adminState('adm_test_time', async (ctx) => {
     const minutes = parseAmount(textOf(ctx));
     if (minutes == null || minutes > 600) return ctx.reply('Daqiqani raqamda kiriting (0–600):');
-    const f = ctx.session.form;
-    const [id] = await db('variants').insert({ category: f.category, title: f.title, price: f.price, time_limit: minutes, is_active: 1, created_at: now() });
-    ctx.session.form = null;
-    log(ctx.from.id, `🛠 Test varianti yaratdi: ${esc(f.title)}`);
-    await ctx.reply(`✅ Variant yaratildi: <b>${esc(f.title)}</b> (${catName(f.category)})\n💵 ${money(f.price)} | ⏱ ${minutes ? `${minutes} daqiqa` : 'cheklanmagan'}\n\nEndi savollarni bittalab kiriting.`, { parse_mode: 'HTML' });
-    return wizard.startWizard(ctx, { type: 'variant', id, back: 'admin' });
+    ctx.session.form.time_limit = minutes;
+    ctx.session.state = 'adm_test_pdf';
+    return ctx.reply(
+      "📄 Shu testning <b>elektron variantini (PDF)</b> yuboring — foydalanuvchilar uni alohida sotib olishadi.\nPDF bo'lmasa — «⏭ O'tkazib yuborish» (keyin «🗂 Kontent» dan qo'shsa ham bo'ladi).",
+      { parse_mode: 'HTML', ...skipKb() },
+    );
   });
+
+  // PDF faylni xabardan olish
+  const readPdf = (ctx) => {
+    const d = ctx.message && ctx.message.document;
+    if (!d) return null;
+    if (d.mime_type !== 'application/pdf' && !/\.pdf$/i.test(d.file_name || '')) return false;
+    return { pdf_id: d.file_id, pdf_name: (d.file_name || 'test.pdf').slice(0, 250) };
+  };
+
+  adminState('adm_test_pdf', async (ctx) => {
+    if (textOf(ctx) === BTN.SKIP) return createVariant(ctx);
+    const pdf = readPdf(ctx);
+    if (pdf === false) return ctx.reply('Bu PDF emas. PDF fayl yuboring yoki «⏭ O\'tkazib yuborish».');
+    if (!pdf) return ctx.reply('PDF faylni yuboring yoki «⏭ O\'tkazib yuborish».');
+    Object.assign(ctx.session.form, pdf);
+    ctx.session.state = 'adm_test_pdfprice';
+    const def = await getNum('default_pdf_price');
+    return ctx.reply("💵 PDF narxini kiriting (so'm). 0 — bepul.", Markup.keyboard([[String(def)], ['0'], [BTN.CANCEL]]).resize());
+  });
+
+  adminState('adm_test_pdfprice', async (ctx) => {
+    const price = parseAmount(textOf(ctx));
+    if (price == null) return ctx.reply('Narxni raqamda kiriting:');
+    ctx.session.form.pdf_price = price;
+    return createVariant(ctx);
+  });
+
+  async function createVariant(ctx) {
+    const f = ctx.session.form;
+    const [id] = await db('variants').insert({
+      category: f.category, title: f.title, price: f.price, time_limit: f.time_limit, is_active: 1, created_at: now(),
+      pdf_id: f.pdf_id || null, pdf_name: f.pdf_name || null, pdf_price: f.pdf_price || 0,
+    });
+    ctx.session.form = null;
+    log(ctx.from.id, `🛠 Test varianti yaratdi: ${esc(f.title)}${f.pdf_id ? ' (+PDF)' : ''}`);
+    await ctx.reply(
+      `✅ Variant yaratildi: <b>${esc(f.title)}</b> (${catName(f.category)})\n💵 ${money(f.price)} | ⏱ ${f.time_limit ? `${f.time_limit} daqiqa` : 'cheklanmagan'}` +
+      `${f.pdf_id ? `\n📄 PDF: ${money(f.pdf_price || 0)}` : ''}\n\nEndi savollarni bittalab kiriting.`,
+      { parse_mode: 'HTML' },
+    );
+    return wizard.startWizard(ctx, { type: 'variant', id, back: 'admin' });
+  }
 
   // ================= Video mavzu qo'shish =================
   adminMenu(BTN.A_VIDEO, (ctx) =>
@@ -376,17 +430,27 @@ function register({ bot, menu, states }) {
     const it = await db(ITEM_TABLE[type]).where({ id }).first();
     if (!it) return safeEdit(ctx, "Topilmadi (o'chirilgan bo'lishi mumkin).", Markup.inlineKeyboard([[Markup.button.callback("⬅️ Ro'yxat", `ac_l:${type}`)]]));
     const q = await cnt(db('questions').where({ owner_type: type, owner_id: id }));
-    const sols = await cnt(db('questions').where({ owner_type: type, owner_id: id }).whereNotNull('sol_ref'));
+
     const b = await cnt(db('purchases').where({ item_type: type, item_id: id }));
     const solved = await cnt(db('results').where({ owner_type: type, owner_id: id }));
+    const pdfBuys = type === 'variant' ? await cnt(db('purchases').where({ item_type: 'pdf', item_id: id })) : 0;
+    const pdfLine = type !== 'variant' ? '' : it.pdf_id ? `\n📄 PDF: ${money(it.pdf_price)} · sotilgan: ${pdfBuys} marta` : "\n📄 PDF: yo'q";
     const text = `<b>${esc(it.title)}</b>\n📂 ${itemGroup(type, it)}\n💵 Narxi: ${money(it.price)}\n⏱ Vaqt: ${it.time_limit ? `${it.time_limit} daqiqa` : 'cheklanmagan'}\n` +
-      `❓ Savollar: ${q} (🎥 video yechimli: ${sols})\n🛒 Sotib olingan: ${b} marta\n🧮 Yechilgan: ${solved} marta\n👁 Holati: ${it.is_active ? "ko'rinadi" : 'yashirin'}`;
+      `❓ Savollar: ${q}\n🎥 Video yechim: ${it.sol_ref ? 'bor ✅' : "yo'q"}\n🛒 Sotib olingan: ${b} marta\n🧮 Yechilgan: ${solved} marta${pdfLine}\n👁 Holati: ${it.is_active ? "ko'rinadi" : 'yashirin'}`;
     const rows = [
       [Markup.button.callback("➕ Savol qo'shish", `ac_q:${type}:${id}`), Markup.button.callback('📋 Savollar', `ac_ql:${type}:${id}`)],
       [Markup.button.callback('💵 Narx', `ac_p:${type}:${id}`), Markup.button.callback('⏱ Vaqt', `ac_tm:${type}:${id}`)],
       [Markup.button.callback(it.is_active ? "🙈 Yashirish" : "👁 Ko'rsatish", `ac_t:${type}:${id}`), Markup.button.callback("🗑 O'chirish", `ac_d:${type}:${id}`)],
     ];
     rows.splice(2, 0, [Markup.button.callback("📂 Bo'limini o'zgartirish", `ac_mv:${type}:${id}`)]);
+    rows.splice(1, 0, it.sol_ref
+      ? [Markup.button.callback('🎥 Yechimni almashtirish', `qws:${type}:${id}`), Markup.button.callback("▶️ Ko'rish", `sol:${type}:${id}`), Markup.button.callback('🗑 Yechim', `qwsd:${type}:${id}`)]
+      : [Markup.button.callback("🎥 Video yechim qo'shish (butun test uchun)", `qws:${type}:${id}`)]);
+    if (type === 'variant') {
+      rows.splice(2, 0, it.pdf_id
+        ? [Markup.button.callback('📄 PDFni almashtirish', `ac_pdf:${id}`), Markup.button.callback('📄 PDF narxi', `ac_pp:${id}`), Markup.button.callback('🗑 PDF', `ac_pdel:${id}`)]
+        : [Markup.button.callback('📄 PDF (elektron variant) yuklash', `ac_pdf:${id}`)]);
+    }
     if (type === 'topic') rows.splice(2, 0, [Markup.button.callback("🎥 Videoni almashtirish", `ac_v:${id}`), Markup.button.callback("▶️ Videoni ko'rish", `vt:${id}`)]);
     rows.push([Markup.button.callback("⬅️ Ro'yxat", `ac_l:${type}`)]);
     const extra = { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) };
@@ -453,8 +517,43 @@ function register({ bot, menu, states }) {
     const { type, id, field } = ctx.session.form;
     await db(ITEM_TABLE[type]).where({ id }).update({ [field]: val });
     ctx.session.form = null;
-    await openPanel(ctx, `✅ O'zgartirildi: ${field === 'price' ? money(val) : `${val} daqiqa`}`);
+    await openPanel(ctx, `✅ O'zgartirildi: ${field === 'time_limit' ? `${val} daqiqa` : money(val)}`);
     return showItem(ctx, type, id, false);
+  });
+
+  // ---- PDF (elektron variant) boshqaruvi ----
+  adminAction(/^ac_pdf:(\d+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    ctx.session.form = { id: Number(ctx.match[1]) };
+    ctx.session.state = 'adm_pdf_upload';
+    return ctx.reply('📄 PDF faylni yuboring:', cancelKb());
+  });
+
+  adminState('adm_pdf_upload', async (ctx) => {
+    const pdf = readPdf(ctx);
+    if (!pdf) return ctx.reply('PDF fayl yuboring:');
+    const { id } = ctx.session.form;
+    const v = await db('variants').where({ id }).first();
+    const upd = { ...pdf };
+    if (v && !v.pdf_id && !v.pdf_price) upd.pdf_price = await getNum('default_pdf_price');
+    await db('variants').where({ id }).update(upd);
+    ctx.session.form = null;
+    log(ctx.from.id, `🛠 PDF yukladi: variant#${id}`);
+    await openPanel(ctx, `✅ PDF saqlandi${upd.pdf_price != null ? ` (narxi ${money(upd.pdf_price)}, «📄 PDF narxi» dan o'zgartiring)` : ''}.`);
+    return showItem(ctx, 'variant', id, false);
+  });
+
+  adminAction(/^ac_pp:(\d+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    ctx.session.form = { type: 'variant', id: Number(ctx.match[1]), field: 'pdf_price' };
+    ctx.session.state = 'adm_item_num';
+    return ctx.reply("📄 PDF narxini kiriting (so'm, 0 — bepul):", cancelKb());
+  });
+
+  adminAction(/^ac_pdel:(\d+)$/, async (ctx) => {
+    await db('variants').where({ id: Number(ctx.match[1]) }).update({ pdf_id: null, pdf_name: null });
+    await ctx.answerCbQuery('🗑 PDF olib tashlandi');
+    return showItem(ctx, 'variant', Number(ctx.match[1]));
   });
 
   adminAction(/^ac_v:(\d+)$/, async (ctx) => {
@@ -670,11 +769,33 @@ function register({ bot, menu, states }) {
 
   // ================= Narxlar va sozlamalar =================
   const PRICE_KEYS = Object.keys(DEFAULT_SETTINGS).filter((k) => !k.startsWith('f_'));
-  const fmtVal = (k, v) => (k === 'payment_info' ? `${String(v).slice(0, 25)}…` : k === 'listing_days' ? `${v} kun` : money(v));
+  const fmtVal = (k, v) => (k === 'cert_signer' ? String(v) : k === 'cert_min_percent' ? `${v}%` : k === 'payment_info' ? `${String(v).slice(0, 25)}…` : /_days$/.test(k) ? `${v} kun` : k === 'ad_interval_hours' ? `${v} soat` : money(v));
 
+  // Tugmalarda qirqilmasligi uchun qisqa nomlar (to'liq izoh tugma bosilganda chiqadi)
+  const SHORT = {
+    start_bonus: "🎁 Start bonusi (ro'yxatdan o'tganga)",
+    referral_bonus: "👥 Do'st taklif qilish bonusi",
+    min_topup: "💳 Minimal to'ldirish summasi",
+    default_test_price: '📝 Test narxi',
+    default_pdf_price: '📄 Test PDF narxi',
+    default_video_price: '🎬 Video mavzu narxi',
+    book_price: "📚 Kitob e'loni narxi",
+    book_days: "📚 Kitob e'loni muddati",
+    center_price: "🏫 Markaz e'loni narxi",
+    center_days: "🏫 Markaz e'loni muddati",
+    teacher_test_price: "👨‍🏫 O'qituvchi testi narxi",
+    ad_interval_hours: '📣 Reklama oralig\'i',
+    cert_min_percent: '🎓 Sertifikat uchun minimal natija',
+    cert_signer: '🎓 Sertifikatdagi imzo',
+    payment_info: "💳 To'lov ma'lumoti (karta)",
+  };
   async function pricesView() {
+    const order = ['start_bonus', 'referral_bonus', ...PRICE_KEYS.filter((k) => !['start_bonus', 'referral_bonus'].includes(k))];
     const rows = [];
-    for (const k of PRICE_KEYS) rows.push([Markup.button.callback(`${SETTING_HELP[k].split(' (')[0].slice(0, 38)}: ${fmtVal(k, await getSetting(k))}`.slice(0, 64), `st:${k}`)]);
+    for (const k of order) {
+      const v = k === 'payment_info' ? "o'zgartirish" : fmtVal(k, await getSetting(k));
+      rows.push([Markup.button.callback(`${SHORT[k] || k}: ${v}`.slice(0, 64), `st:${k}`)]);
+    }
     return { text: "💵 <b>Narxlar va sozlamalar</b>\n\nO'zgartirish uchun bosing:", extra: { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) } };
   }
 
@@ -697,7 +818,7 @@ function register({ bot, menu, states }) {
     const t = textOf(ctx);
     if (!key || !t) return ctx.reply('Qiymat yuboring:');
     let value = t;
-    if (key !== 'payment_info') {
+    if (!['payment_info', 'cert_signer'].includes(key)) {
       const n = parseAmount(t);
       if (n == null) return ctx.reply("Raqam kiriting (masalan 30000):");
       value = String(n);
@@ -716,8 +837,8 @@ function register({ bot, menu, states }) {
     if (!m) return ctx.reply('Format: /set nom qiymat');
     const [, key, value] = m;
     if (!(key in DEFAULT_SETTINGS)) return ctx.reply(`Bunday sozlama yo'q. Mavjudlari: ${PRICE_KEYS.join(', ')}`);
-    if (key !== 'payment_info' && parseAmount(value) == null) return ctx.reply("Qiymat raqam bo'lishi kerak.");
-    await setSetting(key, key === 'payment_info' ? value.trim() : String(parseAmount(value)));
+    if (!['payment_info', 'cert_signer'].includes(key) && parseAmount(value) == null) return ctx.reply("Qiymat raqam bo'lishi kerak.");
+    await setSetting(key, ['payment_info', 'cert_signer'].includes(key) ? value.trim() : String(parseAmount(value)));
     return ctx.reply(`✅ ${key} = ${value.trim()}`);
   });
 

@@ -1,15 +1,12 @@
 // 4-bo'lim: Balans, do'stlarni taklif qilish, admin orqali to'ldirish
 const { Markup } = require('telegraf');
 const { db } = require('../db');
-const config = require('../config');
-const { BTN, cancelKb } = require('../keyboards');
-const { esc, money, getUser, getNum, getSetting, fmtDate, isOn, safeEdit } = require('../utils');
-const { log } = require('../logger');
-const { showMainMenu } = require('../menu');
+const { BTN } = require('../keyboards');
+const { money, getUser, getNum, fmtDate, isOn, safeEdit } = require('../utils');
 
 const refLink = (ctx) => `https://t.me/${ctx.botInfo.username}?start=ref_${ctx.from.id}`;
 
-const TX_NAMES = { referral: '👥 Taklif bonusi', admin: '💳 Admin', purchase: '🛒 Xarid', book: "📚 Kitob e'loni", center: "🏫 Markaz e'loni", teacher: "👨‍🏫 O'qituvchi testi" };
+const TX_NAMES = { referral: '👥 Taklif bonusi', welcome: '🎁 Start bonusi', admin: '💳 Admin', purchase: '🛒 Xarid', book: "📚 Kitob e'loni", center: "🏫 Markaz e'loni", teacher: "👨‍🏫 O'qituvchi testi" };
 
 function register({ bot, menu, states, deepLinks }) {
   const balanceView = async (ctx, edit) => {
@@ -43,41 +40,12 @@ function register({ bot, menu, states, deepLinks }) {
     );
   });
 
-  const topupPrompt = async (ctx) => {
-    if (!(await isOn('topup'))) return showMainMenu(ctx, "⛔ Bu bo'lim vaqtincha o'chirilgan.");
-    ctx.session.state = 'topup_check';
-    const info = await getSetting('payment_info');
-    const adminLine = config.ADMIN_USERNAME ? `\n\nSavollar bo'lsa: @${config.ADMIN_USERNAME}` : '';
-    return ctx.reply(
-      `💳 <b>Balansni to'ldirish</b>\n\n${esc(info)}\n\n🆔 Sizning ID: <code>${ctx.from.id}</code>\n\n📸 To'lov chekini (rasm yoki matn) shu yerga yuboring — admin tekshirib balansingizni to'ldiradi.${adminLine}`,
-      { parse_mode: 'HTML', ...cancelKb() },
-    );
-  };
+  const topupPrompt = (ctx) => require('./topups').prompt(ctx);
   bot.action('bal_topup', async (ctx) => {
     await ctx.answerCbQuery();
     return topupPrompt(ctx);
   });
   deepLinks.topup = topupPrompt;
-
-  // Foydalanuvchi chek yubordi -> adminlarga
-  states.topup_check = async (ctx) => {
-    const u = await getUser(ctx.from.id);
-    const head = `💳 <b>Balansni to'ldirish so'rovi</b>\n👤 ${esc(u.first_name)} ${esc(u.last_name)}\n📞 ${esc(u.phone)}\n🆔 <code>${u.tg_id}</code>${ctx.from.username ? ` (@${esc(ctx.from.username)})` : ''}\n💰 Hozirgi balans: ${money(u.balance)}`;
-    const kb = Markup.inlineKeyboard([[Markup.button.callback("✅ Balansni to'ldirish", `adm_topup:${u.tg_id}`)]]);
-    let sent = 0;
-    for (const adminId of config.ADMIN_IDS) {
-      try {
-        await ctx.telegram.copyMessage(adminId, ctx.chat.id, ctx.message.message_id);
-        await ctx.telegram.sendMessage(adminId, head, { parse_mode: 'HTML', ...kb });
-        sent += 1;
-      } catch (e) {
-        console.error('[topup] adminga yuborilmadi', adminId, e.message);
-      }
-    }
-    ctx.session.state = null;
-    log(ctx.from.id, `💳 To'lov cheki yubordi (adminga ${sent ? 'yetkazildi' : 'yetkazilmadi'})`);
-    return showMainMenu(ctx, sent ? "✅ Chekingiz adminga yuborildi. Tekshirilgach balansingiz to'ldiriladi va sizga xabar keladi." : "⚠️ Hozircha adminga yuborib bo'lmadi, keyinroq urinib ko'ring.");
-  };
 
   bot.action('bal_hist', async (ctx) => {
     await ctx.answerCbQuery();

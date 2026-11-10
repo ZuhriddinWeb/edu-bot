@@ -68,7 +68,7 @@ Kompyuteringizdagi `data/bot.sqlite` dagi foydalanuvchilar, testlar, balanslarni
    ```
    node bot.js migrate-sqlite data/bot.sqlite
    ```
-   
+   (papkali versiyada: `npm run migrate-sqlite -- data/bot.sqlite`)
 4. «🎉 Tayyor! Jami ... ta yozuv ko'chirildi» chiqsa — `.env` dan `MYSQL_URL` qatorini olib tashlang
    (aks holda kompyuterdagi bot ham Railway bazasiga ulanadi).
 5. Railway'dagi botni qayta deploy qiling.

@@ -1,10 +1,10 @@
 // 6-bo'lim: O'quv markaz va xususiy maktab — viloyat -> tuman -> ro'yxat; qo'shish (pullik, 1 oy)
 const { Markup } = require('telegraf');
 const { db } = require('../db');
-const REGIONS = require('../data/regions');
+const REGIONS = require('../regions');
 const { CENTER_KINDS } = require('../constants');
 const { BTN, cancelKb, skipKb, chunk } = require('../keyboards');
-const { esc, money, fmtDate, now, DAY, getNum, getUser, charge, textOf, safeEdit } = require('../utils');
+const { esc, money, fmtDate, now, DAY, getNum, getUser, charge, textOf, safeEdit, isAdmin } = require('../utils');
 const { showMainMenu } = require('../menu');
 const { registerMine } = require('../listings');
 const { log } = require('../logger');
@@ -33,7 +33,7 @@ const districtsKb = (ri, prefix, extraRows = []) =>
 function register({ bot, menu, states, deepLinks }) {
   const mainText = async () => {
     const price = await getNum('center_price');
-    const days = await getNum('listing_days');
+    const days = await getNum('center_days');
     return `🏫 <b>O'quv markaz va xususiy maktablar</b>\n\nViloyat va tuman bo'yicha qidiring yoki o'z markazingizni qo'shing.\n\nℹ️ Qo'shish: ${money(price)} / ${days} kun`;
   };
   const mainKb = () =>
@@ -123,7 +123,7 @@ function register({ bot, menu, states, deepLinks }) {
 
   // --- Qo'shish ---
   const addStart = async (ctx) => {
-    const price = await getNum('center_price');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('center_price'); // admin uchun bepul
     const u = await getUser(ctx.from.id);
     if (u.balance < price) {
       return ctx.reply(`⚠️ Qo'shish narxi ${money(price)}. Balansingiz: ${money(u.balance)}.\n«💰 Balans» bo'limidan to'ldiring.`);
@@ -208,8 +208,8 @@ function register({ bot, menu, states, deepLinks }) {
       return ctx.reply(`Lokatsiya yuboring yoki «${BTN.SKIP}» ni bosing.`);
     }
     ctx.session.state = null;
-    const price = await getNum('center_price');
-    const days = await getNum('listing_days');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('center_price'); // admin uchun bepul
+    const days = await getNum('center_days');
     await ctx.reply("👇 E'lon ko'rinishi:", Markup.removeKeyboard());
     return ctx.reply(card(f) + (f.latitude != null ? '\n📌 Lokatsiya biriktirilgan' : ''), {
       parse_mode: 'HTML',
@@ -230,8 +230,8 @@ function register({ bot, menu, states, deepLinks }) {
   bot.action('ce_confirm', async (ctx) => {
     const f = ctx.session.form;
     if (!f || !f.name || !f.district) return ctx.answerCbQuery("Ma'lumotlar eskirgan, qaytadan qo'shing", { show_alert: true });
-    const price = await getNum('center_price');
-    const days = await getNum('listing_days');
+    const price = isAdmin(ctx.from.id) ? 0 : await getNum('center_price'); // admin uchun bepul
+    const days = await getNum('center_days');
     const expires = now() + days * DAY;
     const res = await charge(ctx.from.id, price, 'center', `${CENTER_KINDS[f.kind].name}: ${f.name}`, async (trx) => {
       await trx('centers').insert({
@@ -250,7 +250,7 @@ function register({ bot, menu, states, deepLinks }) {
 
   registerMine(bot, {
     home: 'ce_home',
-    table: 'centers', p: 'ce', priceKey: 'center_price', txType: 'center',
+    table: 'centers', p: 'ce', priceKey: 'center_price', daysKey: 'center_days', txType: 'center',
     title: (r) => `${CENTER_KINDS[r.kind].icon} ${r.name}`,
   });
 }
