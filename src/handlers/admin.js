@@ -769,7 +769,7 @@ function register({ bot, menu, states }) {
 
   // ================= Narxlar va sozlamalar =================
   const PRICE_KEYS = Object.keys(DEFAULT_SETTINGS).filter((k) => !k.startsWith('f_'));
-  const fmtVal = (k, v) => (k === 'cert_signer' ? String(v) : k === 'cert_min_percent' ? `${v}%` : k === 'payment_info' ? `${String(v).slice(0, 25)}…` : /_days$/.test(k) ? `${v} kun` : k === 'ad_interval_hours' ? `${v} soat` : money(v));
+  const fmtVal = (k, v) => (k === 'cert_signer' ? String(v) : /^cert_.*percent$/.test(k) ? `${v}%` : k === 'payment_info' ? `${String(v).slice(0, 25)}…` : /_days$/.test(k) ? `${v} kun` : k === 'ad_interval_hours' ? `${v} soat` : money(v));
 
   // Tugmalarda qirqilmasligi uchun qisqa nomlar (to'liq izoh tugma bosilganda chiqadi)
   const SHORT = {
@@ -785,7 +785,8 @@ function register({ bot, menu, states }) {
     center_days: "🏫 Markaz e'loni muddati",
     teacher_test_price: "👨‍🏫 O'qituvchi testi narxi",
     ad_interval_hours: '📣 Reklama oralig\'i',
-    cert_min_percent: '🎓 Sertifikat uchun minimal natija',
+    cert_min_percent: '🎓 Mavzu sertifikati: min %',
+    cert_test_min_percent: '🎓 Test sertifikati: min %',
     cert_signer: '🎓 Sertifikatdagi imzo',
     payment_info: "💳 To'lov ma'lumoti (karta)",
   };

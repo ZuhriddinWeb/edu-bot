@@ -277,7 +277,7 @@ const routes = {
       return { correct, total: qs.length, pct: pctT, late: !!late, reveal: false, test_sol: !!(await testSolution('tt', a.owner_id)), details: details.map((d) => ({ id: d.id, your: d.your })) };
     }
     const cert = await require('./handlers/certs').maybeAward(botRef.telegram, me.tg, a.owner_type, a.owner_id, correct, qs.length);
-    const certMin = (await isOn('certs')) ? await getNum('cert_min_percent') : null;
+    const certMin = (await isOn('certs')) ? await require('./handlers/certs').minFor(a.owner_type) : null;
     const pct = qs.length ? Math.round((correct / qs.length) * 100) : 0;
     wlog(me.tg, `🏁 Testni tugatdi (${a.owner_type}#${a.owner_id}): ${correct}/${qs.length} (${pct}%)${late ? ' ⏰ kechikdi' : ''}`);
     return { correct, total: qs.length, pct, late: !!late, reveal: true, test_sol: !!(await testSolution(a.owner_type, a.owner_id)), details, cert, certMin };

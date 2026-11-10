@@ -1,7 +1,7 @@
 // Botda test ishlash: vaqt cheklovi, rasmli savollar, video yechimlar
 const { Markup } = require('telegraf');
 const { db } = require('./db');
-const { esc, now, mmss, isAdmin, isOn, getNum, OWNER_TABLE } = require('./utils');
+const { esc, now, mmss, isAdmin, isOn, OWNER_TABLE } = require('./utils');
 const { log } = require('./logger');
 
 const L = 'ABCDEF';
@@ -96,7 +96,7 @@ async function finish(q, reason) {
   }
   // Sertifikat haqida eslatma (minimal foizga yetmagan bo'lsa)
   if (q.ownerType !== 'tt' && (await isOn('certs'))) {
-    const min = await getNum('cert_min_percent');
+    const min = await require('./handlers/certs').minFor(q.ownerType);
     if (pct < min) text += `\n\n🎓 Sertifikat olish uchun kamida <b>${min}%</b> natija kerak. Yana urinib ko'ring!`;
   }
   const res = await q.telegram.sendMessage(q.chatId, text, { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) });

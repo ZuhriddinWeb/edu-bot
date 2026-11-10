@@ -341,7 +341,7 @@
     const u = ME.user; const f = ME.features;
     const learn = [
       f.rating && navRow('rating', 'trophy', 'y', 'Reyting', "Eng faol o'quvchilar"),
-      f.certs && navRow('certs', 'award', 'g', 'Mening sertifikatlarim', '80% dan yuqori natijalar uchun'),
+      f.certs && navRow('certs', 'award', 'g', 'Mening sertifikatlarim', 'Test va mavzu sertifikatlari'),
       f.tests && navRow('pdfs', 'file', 'b', 'Testlar PDF holatida', 'Chop etish uchun elektron variantlar'),
       f.teacher && navRow('ttcode', 'key', '', "O'qituvchi testini yechish", 'Kod yoki havola orqali'),
     ].filter(Boolean).join('');
@@ -971,10 +971,10 @@
     loading();
     const d = await api('/api/certs');
     app.innerHTML = `<h1>🎓 Mening sertifikatlarim</h1>` + (d.items.length
-      ? `<div class="list">${d.items.map((c) => `<button class="row" data-act="cert" data-arg="${c.id}"><span>🎓</span>
+      ? `<div class="list">${d.items.map((c) => `<button class="row" data-act="cert" data-arg="${c.id}"><span>${c.type === 'variant' ? '📝' : '🎬'}</span>
           <span class="grow"><div class="title">${h(c.title)}</div><div class="muted">${Math.round((c.correct / c.total) * 100)}% · ${h(c.date)}</div></span><span class="chev">›</span></button>`).join('')}</div>`
       : `<div class="card center"><p style="font-size:40px;margin:0">🎓</p><p>Hozircha sertifikat yo'q.</p>
-          <p class="muted">Testni yoki videodars testini ${d.min != null ? `<b>${d.min}%</b> va undan yuqori` : 'yuqori'} natija bilan yeching — sertifikat avtomatik beriladi.</p></div>`);
+          <p class="muted">${d.min != null ? `📝 Test variantini <b>${d.minTest}%</b> dan, 🎬 videodars testini <b>${d.min}%</b> dan` : 'Testlarni yuqori natija bilan'} yuqori natija bilan yeching — sertifikat avtomatik beriladi.</p></div>`);
     actions.cert = (id) => go(certScreen, d.items.find((c) => String(c.id) === id));
     bind();
   }

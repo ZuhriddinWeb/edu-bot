@@ -1,6 +1,7 @@
 /**
- * 🎓 Sertifikatlar: test varianti yoki videodars (mavzu) testini belgilangan foizdan
- * (cert_min_percent, standart 80%) yuqori yechgan foydalanuvchiga avtomatik beriladi.
+ * 🎓 Sertifikatlar — ikki xil dizayn:
+ *  • Mavzu sertifikati (videodars testi) — zumrad ramkali dizayn, cert_min_percent (standart 80%)
+ *  • Test sertifikati (test varianti) — zamonaviy dizayn, cert_test_min_percent (standart 60%)
  * Har bir test/mavzu uchun bitta sertifikat; keyinroq yaxshiroq natija qilsa — yangilanadi.
  */
 const { Markup } = require('telegraf');
@@ -20,15 +21,30 @@ async function ownerTitle(type, id) {
   return (c ? `${c.name} — ${v.title}` : v.title).slice(0, 250);
 }
 
+// Sertifikat turi bo'yicha minimal foiz
+const minFor = (type) => getNum(type === 'variant' ? 'cert_test_min_percent' : 'cert_min_percent');
+
 async function imageFor(cert) {
   const u = await getUser(cert.user_tg);
-  return require('../certificate').render({
+  if (cert.owner_type === 'variant') {
+    return require('../certificateTest').renderTest({
+      name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
+      test: cert.title,
+      correct: cert.correct,
+      total: cert.total,
+      date: fmtDate(cert.created_at),
+      signer: await getSetting('cert_signer'),
+      no: `T-${String(cert.id).padStart(6, '0')}`,
+    });
+  }
+  return require('../certificateTopic').renderTopic({
     name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
     topic: cert.title,
     correct: cert.correct,
     total: cert.total,
     date: fmtDate(cert.created_at),
     signer: await getSetting('cert_signer'),
+    no: `V-${String(cert.id).padStart(6, '0')}`,
   });
 }
 
@@ -48,7 +64,7 @@ async function maybeAward(telegram, tg, type, id, correct, total) {
   try {
     if (!['variant', 'topic'].includes(type) || !total || !(await isOn('certs'))) return false;
     const pct = Math.round((correct / total) * 100);
-    if (pct < (await getNum('cert_min_percent'))) return false;
+    if (pct < (await minFor(type))) return false;
     const title = await ownerTitle(type, id);
     if (!title) return false;
     const old = await db('certificates').where({ user_tg: tg, owner_type: type, owner_id: id }).first();
@@ -76,13 +92,14 @@ function register({ bot }) {
   // Mening sertifikatlarim
   const myList = async (ctx) => {
     const list = await db('certificates').where({ user_tg: ctx.from.id }).orderBy('id', 'desc').limit(40);
-    const min = await getNum('cert_min_percent');
+    const minT = await minFor('variant');
+    const minV = await minFor('topic');
     if (!list.length) {
-      return safeEdit(ctx, `🎓 <b>Mening sertifikatlarim</b>\n\nHozircha sertifikat yo'q.\nTestni yoki videodars testini <b>${min}%</b> va undan yuqori natija bilan yeching — sertifikat avtomatik beriladi.`, {
+      return safeEdit(ctx, `🎓 <b>Mening sertifikatlarim</b>\n\nHozircha sertifikat yo'q.\n📝 Test variantini <b>${minT}%</b> dan, 🎬 videodars testini <b>${minV}%</b> dan yuqori natija bilan yeching — sertifikat avtomatik beriladi.`, {
         parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Yopish', 'close_msg')]]),
       });
     }
-    const rows = list.map((c) => [Markup.button.callback(`🎓 ${c.title} — ${Math.round((c.correct / c.total) * 100)}%`.slice(0, 60), `cert_get:${c.id}`)]);
+    const rows = list.map((c) => [Markup.button.callback(`${c.owner_type === 'variant' ? '📝' : '🎬'} ${c.title} — ${Math.round((c.correct / c.total) * 100)}%`.slice(0, 60), `cert_get:${c.id}`)]);
     rows.push([Markup.button.callback('⬅️ Yopish', 'close_msg')]);
     return safeEdit(ctx, `🎓 <b>Mening sertifikatlarim</b> (${list.length})\n\nKo'rish uchun bosing:`, { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) });
   };
@@ -118,4 +135,4 @@ function register({ bot }) {
   });
 }
 
-module.exports = { register, maybeAward };
+module.exports = { register, maybeAward, imageFor, minFor };

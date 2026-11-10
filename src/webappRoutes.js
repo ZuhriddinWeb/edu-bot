@@ -205,9 +205,10 @@ module.exports = (h) => {
     'GET /api/certs': async (me) => {
       const list = await db('certificates').where({ user_tg: me.tg }).orderBy('id', 'desc').limit(50);
       return {
-        min: (await isOn('certs')) ? await getNum('cert_min_percent') : null,
+        min: (await isOn('certs')) ? await require('./handlers/certs').minFor('topic') : null,
+        minTest: (await isOn('certs')) ? await require('./handlers/certs').minFor('variant') : null,
         items: list.map((c) => ({
-          id: c.id, title: c.title, correct: c.correct, total: c.total, date: fmtDate(c.created_at),
+          id: c.id, type: c.owner_type, title: c.title, correct: c.correct, total: c.total, date: fmtDate(c.created_at),
           img: `/api/cert/img?id=${c.id}&s=${sig(`cert:${c.id}:${me.tg}`)}`,
         })),
       };
@@ -216,10 +217,7 @@ module.exports = (h) => {
     'POST /api/cert/send': async (me, q, body) => {
       const c = await db('certificates').where({ id: Number(body.id), user_tg: me.tg }).first();
       if (!c) throw new ApiError(404, 'not_found', 'Sertifikat topilmadi');
-      const img = await require('./certificate').render({
-        name: `${me.u.first_name || ''} ${me.u.last_name || ''}`.trim(), topic: c.title, correct: c.correct, total: c.total,
-        date: fmtDate(c.created_at), signer: await require('./utils').getSetting('cert_signer'),
-      });
+      const img = await require('./handlers/certs').imageFor(c);
       await bot().telegram.sendDocument(me.tg, { source: img, filename: `sertifikat-${c.id}.jpg` }, { caption: `🎓 ${esc(c.title)}`, parse_mode: 'HTML' });
       wlog(me.tg, `🎓 Sertifikatni yuklab oldi: ${esc(c.title)}`);
       return { ok: true };
@@ -356,11 +354,7 @@ module.exports = (h) => {
   async function certImage(res, q, send) {
     const c = await db('certificates').where({ id: Number(q.id) }).first();
     if (!c || q.s !== sig(`cert:${c.id}:${c.user_tg}`)) return send(res, 403, { error: 'forbidden' });
-    const u = await getUser(c.user_tg);
-    const img = await require('./certificate').render({
-      name: `${u.first_name || ''} ${u.last_name || ''}`.trim(), topic: c.title, correct: c.correct, total: c.total,
-      date: fmtDate(c.created_at), signer: await require('./utils').getSetting('cert_signer'),
-    });
+    const img = await require('./handlers/certs').imageFor(c);
     res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600' });
     return res.end(img);
   }
