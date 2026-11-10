@@ -172,6 +172,13 @@ function createBot(token) {
   bot.on('callback_query', (ctx) => ctx.answerCbQuery('Bu tugma eskirgan. /start ni bosing.').catch(() => {}));
 
   bot.catch((err, ctx) => {
+    // Foydalanuvchi botni bloklagan / akkaunti o'chgan — bu xato emas, shunchaki qisqa yozib qo'yamiz
+    const code = err && err.response && err.response.error_code;
+    const desc = (err && err.response && err.response.description) || '';
+    if (code === 403 || /bot was blocked|user is deactivated|chat not found/i.test(desc)) {
+      console.log(`[info] ${ctx.from ? ctx.from.id : '?'}: ${desc || 'xabar yetkazilmadi (403)'}`);
+      return;
+    }
     console.error(`[xato] update ${ctx.update && ctx.update.update_id}:`, err);
     ctx.reply("⚠️ Xatolik yuz berdi. Qaytadan urinib ko'ring yoki /start ni bosing.").catch(() => {});
   });

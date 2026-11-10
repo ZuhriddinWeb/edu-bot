@@ -1,6 +1,6 @@
 {
   "name": "edu-bot",
-  "version": "2.15.0",
+  "version": "2.15.1",
   "description": "Ta'lim Telegram boti: testlar, videodarslar, balans, kitoblar, o'quv markazlar",
   "main": "src/index.js",
   "scripts": {
