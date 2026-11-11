@@ -207,10 +207,10 @@ function register({ bot, menu, states, deepLinks }) {
     } else if (textOf(ctx) !== BTN.SKIP) {
       return ctx.reply(`Lokatsiya yuboring yoki «${BTN.SKIP}» ni bosing.`);
     }
-    ctx.session.state = null;
+    ctx.session.state = 'preview'; // tasdiqlash kutilmoqda
     const price = isAdmin(ctx.from.id) ? 0 : await getNum('center_price'); // admin uchun bepul
     const days = await getNum('center_days');
-    await ctx.reply("👇 E'lon ko'rinishi:", Markup.removeKeyboard());
+    await ctx.reply("👇 E'lon ko'rinishi:", cancelKb());
     return ctx.reply(card(f) + (f.latitude != null ? '\n📌 Lokatsiya biriktirilgan' : ''), {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
@@ -222,6 +222,7 @@ function register({ bot, menu, states, deepLinks }) {
 
   bot.action('ce_cancel', async (ctx) => {
     ctx.session.form = null;
+    ctx.session.state = null;
     await ctx.answerCbQuery('Bekor qilindi');
     await ctx.editMessageReplyMarkup(undefined).catch(() => {});
     return showMainMenu(ctx);
@@ -242,6 +243,7 @@ function register({ bot, menu, states, deepLinks }) {
     });
     if (res === 'nofunds') return ctx.answerCbQuery(`Balansda mablag' yetarli emas. Kerak: ${money(price)}`, { show_alert: true });
     ctx.session.form = null;
+    ctx.session.state = null;
     log(ctx.from.id, `🏫 E'lon joyladi: ${esc(f.name)} (${esc(f.region)}, ${esc(f.district)}) — ${money(price)}`);
     await ctx.answerCbQuery('✅ Joylandi!');
     await ctx.editMessageReplyMarkup(undefined).catch(() => {});

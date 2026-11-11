@@ -68,6 +68,9 @@ function createBot(token) {
     return next();
   });
 
+  // Jarayon tugagach pastki menyuni tiklash (vaqtinchalik tugmalar qolib ketmasligi uchun)
+  bot.use(cleaner.restoreMiddleware());
+
   // Harakatlarni log kanaliga yozish
   bot.use(logger.middleware());
 
@@ -159,6 +162,7 @@ function createBot(token) {
       cleaner.remember(ctx, ctx.message.message_id); // foydalanuvchi javobi ham keyin o'chadi
       return states[st](ctx);
     }
+    ctx.session.state = null;
     await cleaner.cleanup(ctx);
     return showMainMenu(ctx);
   });

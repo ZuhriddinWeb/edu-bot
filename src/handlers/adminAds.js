@@ -91,8 +91,8 @@ function register({ bot, menu, states }) {
     if (!days || days > 365) return ctx.reply('Kunlar sonini kiriting (1–365):');
     const f = ctx.session.form;
     f.days = days;
-    ctx.session.state = null;
-    await ctx.reply(`👇 Ko'rinishi (${days} kun, bugundan ${fmtDate(now() + days * DAY)} gacha):`, Markup.removeKeyboard());
+    ctx.session.state = 'adm_preview'; // tasdiqlash kutilmoqda
+    await ctx.reply(`👇 Ko'rinishi (${days} kun, bugundan ${fmtDate(now() + days * DAY)} gacha):`, cancelKb());
     return sendAd(ctx, f, [
       [Markup.button.callback('✅ Joylash', 'ad_save'), Markup.button.callback('❌ Bekor', 'ad_cancel')],
     ]);

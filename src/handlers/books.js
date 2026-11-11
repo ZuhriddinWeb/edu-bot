@@ -158,11 +158,11 @@ function register({ bot, menu, states, deepLinks }) {
     const photos = ctx.message.photo;
     if (photos && photos.length) ctx.session.form.photo_id = photos[photos.length - 1].file_id;
     else if (textOf(ctx) !== BTN.SKIP) return ctx.reply(`Rasm yuboring yoki «${BTN.SKIP}» ni bosing.`);
-    ctx.session.state = null;
+    ctx.session.state = 'preview'; // tasdiqlash kutilmoqda (pastda «Bekor qilish» qoladi)
     const f = ctx.session.form;
     const price = isAdmin(ctx.from.id) ? 0 : await getNum('book_price'); // admin uchun bepul
     const days = await getNum('book_days');
-    await ctx.reply('👇 E\'lon ko\'rinishi:', Markup.removeKeyboard());
+    await ctx.reply('👇 E\'lon ko\'rinishi:', cancelKb());
     const kb = Markup.inlineKeyboard([
       [Markup.button.callback(`✅ Joylash — ${money(price)} (${days} kun)`, 'bk_confirm')],
       [Markup.button.callback('❌ Bekor qilish', 'bk_cancel')],
@@ -173,6 +173,7 @@ function register({ bot, menu, states, deepLinks }) {
 
   bot.action('bk_cancel', async (ctx) => {
     ctx.session.form = null;
+    ctx.session.state = null;
     await ctx.answerCbQuery('Bekor qilindi');
     await ctx.editMessageReplyMarkup(undefined).catch(() => {});
     return showMainMenu(ctx);
@@ -189,6 +190,7 @@ function register({ bot, menu, states, deepLinks }) {
     });
     if (res === 'nofunds') return ctx.answerCbQuery(`Balansda mablag' yetarli emas. Kerak: ${money(price)}`, { show_alert: true });
     ctx.session.form = null;
+    ctx.session.state = null;
     log(ctx.from.id, `📚 Kitob e'lonini joyladi: ${esc(f.title)} — ${money(price)}`);
     await ctx.answerCbQuery('✅ Joylandi!');
     await ctx.editMessageReplyMarkup(undefined).catch(() => {});
