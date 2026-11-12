@@ -28,7 +28,7 @@ async function imageFor(cert) {
   const u = await getUser(cert.user_tg);
   if (cert.owner_type === 'variant') {
     return require('../certificateTest').renderTest({
-      name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
+      name: cert.cert_name || `${u.first_name || ''} ${u.last_name || ''}`.trim(),
       test: cert.title,
       correct: cert.correct,
       total: cert.total,
@@ -38,7 +38,7 @@ async function imageFor(cert) {
     });
   }
   return require('../certificateTopic').renderTopic({
-    name: `${u.first_name || ''} ${u.last_name || ''}`.trim(),
+    name: cert.cert_name || `${u.first_name || ''} ${u.last_name || ''}`.trim(),
     topic: cert.title,
     correct: cert.correct,
     total: cert.total,
@@ -69,11 +69,12 @@ async function maybeAward(telegram, tg, type, id, correct, total) {
     if (!title) return false;
     const old = await db('certificates').where({ user_tg: tg, owner_type: type, owner_id: id }).first();
     if (old && old.correct / old.total >= correct / total) return false; // yaxshiroq natija emas
+    const certName = require('../profile').fullName(await getUser(tg)).slice(0, 120);
     if (old) {
-      await db('certificates').where({ id: old.id }).update({ correct, total, title, created_at: now() });
+      await db('certificates').where({ id: old.id }).update({ correct, total, title, cert_name: certName, created_at: now() });
     } else {
       try {
-        await db('certificates').insert({ user_tg: tg, owner_type: type, owner_id: id, title, correct, total, created_at: now() });
+        await db('certificates').insert({ user_tg: tg, owner_type: type, owner_id: id, title, correct, total, cert_name: certName, created_at: now() });
       } catch (e) {
         return false; // parallel so'rov allaqachon yozgan
       }

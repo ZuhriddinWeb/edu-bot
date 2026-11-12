@@ -71,6 +71,8 @@
   .hero .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hero .avatar { width: 46px; height: 46px; border-radius: 15px; background: rgba(255,255,255,.18); display: grid; place-items: center; font: 700 18px var(--display); }
   .hero .name { font-weight: 700; font-size: 16px; }
+  .hero .who { cursor: pointer; }
+  .hero .edit-n { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12px; opacity: .85; background: rgba(255,255,255,.16); border-radius: 999px; padding: 2px 9px; }
   .hero .phone { font-size: 13px; opacity: .78; }
   .hero .bal-l { margin-top: 22px; font-size: 13px; opacity: .8; }
   .hero .bal { font: 700 32px/1.1 var(--display); letter-spacing: -0.02em; margin: 2px 0 14px; }
@@ -357,8 +359,9 @@
     app.innerHTML = `
       <section class="hero">
         <div class="stars"></div><div class="orbit"><span class="moon"></span></div><div class="planet"></div>
-        <div class="who"><div class="avatar">${h((u.first_name || '?')[0])}</div>
-          <div><div class="name">${h(u.first_name)} ${h(u.last_name)}</div><div class="phone">${h(u.phone)}</div></div></div>
+        <div class="who" data-act="pname"><div class="avatar">${h((u.first_name || '?')[0])}</div>
+          <div><div class="name">${h(u.first_name)} ${h(u.last_name)}</div><div class="phone">${h(u.phone)}</div>
+          <span class="edit-n">✏️ Tahrirlash</span></div></div>
         <div class="bal-l">Balansingiz</div>
         <div class="bal">${money(u.balance).replace(" so'm", '')}<small>so'm</small></div>
         <div class="acts">
@@ -382,6 +385,7 @@
     const u = ME.ad.btn_url;
     if (/^https:\/\/t\.me\//.test(u) && tg) tg.openTelegramLink(u); else openLink(u);
   };
+  actions.pname = () => go(nameScreen);
   actions.open = (k) => {
     const map = {
       tests: testsCats, videos: videoGroups, rating: ratingScreen, balance: balanceScreen, books: booksScreen, centers: centersScreen,
@@ -823,6 +827,28 @@
   }
 
   // ---------- ☎️ Admin bilan bog'lanish ----------
+  // ---------- ✏️ Ism-familiyani o'zgartirish ----------
+  function nameScreen() {
+    const u = ME.user;
+    const locked = ME.nameNext && ME.nameNext > Date.now();
+    app.innerHTML = `<h1>✏️ Ism-familiya</h1>
+      <div class="card"><div class="kv"><span>Hozirgi</span><b>${h(u.first_name)} ${h(u.last_name)}</b></div>
+        ${ME.nameDays ? `<p class="muted">⚠️ Ismni <b>${ME.nameDays} kunda bir marta</b> o'zgartirish mumkin. Oldin olingan sertifikatlarda eski ism qoladi.</p>` : ''}</div>
+      ${locked ? `<div class="empty">🔒 Ismni <b>${date(ME.nameNext)}</b> dan keyin yana o'zgartirish mumkin.</div>` : `
+      <label class="lbl">Ism</label><input id="n_first" maxlength="50" value="${h(u.first_name || '')}">
+      <label class="lbl">Familiya</label><input id="n_last" maxlength="50" value="${h(u.last_name || '')}">
+      <button class="btn" data-act="save">💾 Saqlash</button>`}`;
+    actions.save = (a, el) => submitting(el, async () => {
+      const first = val('n_first').trim(); const last = val('n_last').trim();
+      if (first.length < 2 || last.length < 2) return toast("Ism va familiyani to'liq kiriting");
+      if (!(await confirmBox(`Ism «${first} ${last}» ga o'zgartirilsinmi?${ME.nameDays ? ` Keyingi o'zgartirish ${ME.nameDays} kundan keyin mumkin bo'ladi.` : ''}`))) return;
+      await api('/api/profile/name', { first_name: first, last_name: last });
+      ME = await api('/api/me');
+      doneCard('✅', "Ism-familiya o'zgartirildi", `${first} ${last}`);
+    });
+    bind();
+  }
+
   function supportScreen() {
     const st = { image: null };
     app.innerHTML = `<h1>☎️ Admin bilan bog'lanish</h1>
@@ -1246,6 +1272,10 @@
         <div class="kv"><span>Balans</span><b>${money(u.balance)}</b></div><div class="kv"><span>Qo'shilgan</span><b>${u.created}</b></div>
         <div class="kv"><span>Oxirgi faollik</span><b>${u.seen}</b></div><div class="kv"><span>Xaridlar / takliflar</span><b>${u.buys} / ${u.refs}</b></div>
         <div class="kv"><span>Holati</span><b>${u.blocked ? '🚫 Bloklangan' : u.registered ? '✅ Faol' : "⚠️ Ro'yxatdan o'tmagan"}</b></div></div>
+      <h2>Ism-familiya</h2>
+      <div class="card"><input id="un_f" maxlength="50" placeholder="Ism" value="${h(u.first_name || '')}">
+        <input id="un_l" maxlength="50" placeholder="Familiya" value="${h(u.last_name || '')}">
+        <button class="btn sec" data-act="uname">✏️ Ismni saqlash</button></div>
       <h2>Balansni o'zgartirish</h2>
       <div class="card"><input id="ub_a" type="number" inputmode="numeric" placeholder="Masalan 20000 yoki -5000">
         <button class="btn" data-act="bal">Saqlash</button></div>
@@ -1261,6 +1291,11 @@
       if (!amount) return say('Summani kiriting');
       if (!(await confirmBox(`${amount > 0 ? "Qo'shish" : 'Ayirish'}: ${money(Math.abs(amount))}?`))) return;
       await api('/api/admin/user/balance', { tg: u.tg, amount }); say('✅ Saqlandi'); adUserScreen(tgId);
+    });
+    actions.uname = (a, el) => submitting(el, async () => {
+      const first = val('un_f').trim(); const last = val('un_l').trim();
+      if (first.length < 2 || last.length < 2) return say("Ism va familiyani to'liq kiriting");
+      await api('/api/admin/user/name', { tg: u.tg, first_name: first, last_name: last }); say('✅ Ism saqlandi'); adUserScreen(tgId);
     });
     actions.msg = (a, el) => submitting(el, async () => {
       const text = val('um_t').trim(); if (!text) return say('Xabar yozing');

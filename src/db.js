@@ -253,6 +253,16 @@ async function migrate() {
   }
   await addColumn('topups', 'receipt_id', (t) => t.string('receipt_id', 255));
   await addColumn('users', 'last_ad_at', (t) => t.bigInteger('last_ad_at'));
+  // Ismni oxirgi marta o'zgartirgan vaqt (30 kunda bir marta cheklovi uchun)
+  await addColumn('users', 'name_changed_at', (t) => t.bigInteger('name_changed_at'));
+  // Sertifikat berilgan paytdagi ism (keyingi ism o'zgarishi sertifikatga ta'sir qilmaydi)
+  await addColumn('certificates', 'cert_name', (t) => t.string('cert_name', 120));
+  // Eski sertifikatlarga hozirgi ismni muhrlab qo'yamiz (bir marta)
+  const noName = await db('certificates').whereNull('cert_name').select('id', 'user_tg');
+  for (const c of noName) {
+    const u = await db('users').where({ tg_id: c.user_tg }).first();
+    if (u) await db('certificates').where({ id: c.id }).update({ cert_name: `${u.first_name || ''} ${u.last_name || ''}`.trim().slice(0, 120) });
+  }
   await addColumn('questions', 'photo_id', (t) => t.string('photo_id', 255));
   await addColumn('questions', 'sol_type', (t) => t.string('sol_type', 10)); // video | document | url
   await addColumn('questions', 'sol_ref', (t) => t.text('sol_ref'));

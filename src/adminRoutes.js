@@ -91,7 +91,7 @@ module.exports = (h) => {
         }
       }
       return {
-        tg, name: `${u.first_name || ''} ${u.last_name || ''}`.trim(), username: u.username, phone: u.phone, balance: u.balance,
+        tg, name: `${u.first_name || ''} ${u.last_name || ''}`.trim(), first_name: u.first_name || '', last_name: u.last_name || '', username: u.username, phone: u.phone, balance: u.balance,
         blocked: !!u.is_blocked, registered: !!u.is_registered, isAdmin: isAdmin(tg),
         created: u.created_at ? fmtDate(u.created_at) : '—', seen: u.last_seen ? fmtDate(u.last_seen) : '—',
         refs: await cnt(db('users').where({ referrer_id: tg, is_registered: 1 })), buys: await cnt(db('purchases').where({ user_tg: tg })),
@@ -111,6 +111,15 @@ module.exports = (h) => {
       wlog(me.tg, `🛠 Balans: ${tg} ga ${amount > 0 ? '+' : ''}${money(amount)}`);
       bot().telegram.sendMessage(tg, `${amount > 0 ? "✅ Balansingiz to'ldirildi" : 'ℹ️ Balansingizdan yechildi'}: <b>${money(Math.abs(amount))}</b>\n💰 Joriy balans: <b>${money(u.balance)}</b>`, { parse_mode: 'HTML' }).catch(() => {});
       return { balance: u.balance };
+    },
+
+    'POST /api/admin/user/name': async (me, q, b) => {
+      mustAdmin(me);
+      const tg = Number(b.tg);
+      const r = await require('./profile').changeName(tg, b.first_name, b.last_name, me.tg);
+      if (r.error) throw new ApiError(400, 'bad_input', r.error);
+      bot().telegram.sendMessage(tg, `ℹ️ Admin ism-familiyangizni o'zgartirdi: <b>${esc(r.name)}</b>`, { parse_mode: 'HTML' }).catch(() => {});
+      return { ok: true, name: r.name };
     },
 
     'POST /api/admin/user/block': async (me, q, b) => {

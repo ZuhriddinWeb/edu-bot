@@ -120,6 +120,8 @@ const routes = {
     wlog(me.tg, 'Mini ilovani ochdi');
     return {
       user: { tg_id: me.tg, first_name: me.u.first_name, last_name: me.u.last_name, phone: me.u.phone, balance: me.u.balance },
+      nameNext: await require('./profile').nextChangeAt(me.u),
+      nameDays: await getNum('name_change_days'),
       admin: me.admin,
       features: flags,
       bot,
@@ -284,6 +286,13 @@ const routes = {
   },
 
   // Butun test uchun bitta video yechim — botga yuboriladi
+  // ✏️ Ism-familiyani o'zgartirish (30 kunda bir marta)
+  'POST /api/profile/name': async (me, q, body) => {
+    const r = await require('./profile').changeName(me.tg, body.first_name, body.last_name);
+    if (r.error) throw new ApiError(400, 'bad_input', r.error);
+    return { ok: true, name: r.name };
+  },
+
   'POST /api/solution/test': async (me, q, body) => {
     const type = String(body.type || '');
     const id = Number(body.id);

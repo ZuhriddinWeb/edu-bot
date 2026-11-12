@@ -1,8 +1,9 @@
 // 4-bo'lim: Balans, do'stlarni taklif qilish, admin orqali to'ldirish
 const { Markup } = require('telegraf');
 const { db } = require('../db');
-const { BTN } = require('../keyboards');
-const { money, getUser, getNum, fmtDate, isOn, safeEdit } = require('../utils');
+const { BTN, cancelKb } = require('../keyboards');
+const { money, getUser, getNum, fmtDate, isOn, safeEdit, esc } = require('../utils');
+const { showMainMenu } = require('../menu');
 
 const refLink = (ctx) => `https://t.me/${ctx.botInfo.username}?start=ref_${ctx.from.id}`;
 
@@ -18,6 +19,7 @@ function register({ bot, menu, states, deepLinks }) {
     if (refOn) rows.push([Markup.button.callback("👥 Do'stlarni taklif qilish", 'bal_ref')]);
     if (await isOn('topup')) rows.push([Markup.button.callback("💳 Admin orqali to'ldirish", 'bal_topup')]);
     rows.push([Markup.button.callback('📜 Amallar tarixi', 'bal_hist')]);
+    rows.push([Markup.button.callback("✏️ Ism-familiyani o'zgartirish", 'pf_name')]);
     const text = `💰 <b>Balansingiz: ${money(u.balance)}</b>` + (refOn ? `\n\n👥 Taklif qilgan do'stlaringiz: ${cnt} ta\n🎁 Har bir do'st uchun: ${money(bonus)}\n<i>(Bonus do'stingiz kanalga a'zo bo'lib ro'yxatdan o'tgach beriladi)</i>` : '');
     const extra = { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) };
     return edit ? safeEdit(ctx, text, extra) : ctx.reply(text, extra);
@@ -39,6 +41,43 @@ function register({ bot, menu, states, deepLinks }) {
       { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.url('📤 Ulashish', shareUrl)], [Markup.button.callback('⬅️ Balans', 'bal_home')]]) },
     );
   });
+
+  // ✏️ Ism-familiyani o'zgartirish (30 kunda bir marta)
+  bot.action('pf_name', async (ctx) => {
+    const profile = require('../profile');
+    const u = await getUser(ctx.from.id);
+    const next = await profile.nextChangeAt(u);
+    if (next) return ctx.answerCbQuery(`Ismni ${fmtDate(next)} dan keyin yana o'zgartirish mumkin.`, { show_alert: true });
+    await ctx.answerCbQuery();
+    const days = await getNum('name_change_days');
+    ctx.session.state = 'pf_first';
+    ctx.session.form = {};
+    return ctx.reply(
+      `✏️ <b>Ism-familiyani o'zgartirish</b>\n\nHozirgi: <b>${esc(profile.fullName(u))}</b>\n\n` +
+      (days ? `⚠️ Ismni <b>${days} kunda bir marta</b> o'zgartirish mumkin. Oldin olingan sertifikatlarda eski ism qoladi.\n\n` : '') +
+      'Yangi <b>ismingizni</b> kiriting:',
+      { parse_mode: 'HTML', ...cancelKb() },
+    );
+  });
+  states.pf_first = async (ctx) => {
+    const profile = require('../profile');
+    const t = profile.clean(ctx.message && ctx.message.text);
+    if (!profile.validName(t)) return ctx.reply("Ismni to'g'ri kiriting (2–50 ta harf):");
+    ctx.session.form = { first: t };
+    ctx.session.state = 'pf_last';
+    return ctx.reply('Endi <b>familiyangizni</b> kiriting:', { parse_mode: 'HTML' });
+  };
+  states.pf_last = async (ctx) => {
+    const profile = require('../profile');
+    const t = profile.clean(ctx.message && ctx.message.text);
+    if (!profile.validName(t)) return ctx.reply("Familiyani to'g'ri kiriting (2–50 ta harf):");
+    const first = ctx.session.form && ctx.session.form.first;
+    ctx.session.state = null;
+    ctx.session.form = null;
+    if (!first) return showMainMenu(ctx);
+    const r = await profile.changeName(ctx.from.id, first, t);
+    return showMainMenu(ctx, r.ok ? `✅ Ism-familiyangiz o'zgartirildi: <b>${esc(r.name)}</b>` : `⚠️ ${esc(r.error)}`);
+  };
 
   const topupPrompt = (ctx) => require('./topups').prompt(ctx);
   bot.action('bal_topup', async (ctx) => {

@@ -99,6 +99,37 @@ function register({ bot, menu, states }) {
 
   const userRow = (u) => [Markup.button.callback(`${u.is_blocked ? '🚫 ' : ''}${u.first_name || ''} ${u.last_name || ''} — ${u.phone || u.tg_id}`.slice(0, 60), `au:${u.tg_id}`)];
 
+  // ✏️ Admin: foydalanuvchi ism-familiyasini o'zgartirish (muddat cheklovisiz)
+  adminAction(/^au_name:(\d+)$/, async (ctx) => {
+    const tg = Number(ctx.match[1]);
+    const u = await getUser(tg);
+    if (!u) return ctx.answerCbQuery('Topilmadi', { show_alert: true });
+    await ctx.answerCbQuery();
+    ctx.session.state = 'adm_name_first';
+    ctx.session.form = { tg };
+    return ctx.reply(`✏️ <b>${esc(require('../profile').fullName(u))}</b>\n\nYangi <b>ismni</b> kiriting:`, { parse_mode: 'HTML', ...cancelKb() });
+  });
+  adminState('adm_name_first', async (ctx) => {
+    const profile = require('../profile');
+    const t = profile.clean(textOf(ctx));
+    if (!profile.validName(t)) return ctx.reply("Ismni to'g'ri kiriting (2–50 ta harf):");
+    ctx.session.form.first = t;
+    ctx.session.state = 'adm_name_last';
+    return ctx.reply('Endi <b>familiyani</b> kiriting:', { parse_mode: 'HTML' });
+  });
+  adminState('adm_name_last', async (ctx) => {
+    const profile = require('../profile');
+    const t = profile.clean(textOf(ctx));
+    if (!profile.validName(t)) return ctx.reply("Familiyani to'g'ri kiriting (2–50 ta harf):");
+    const f = ctx.session.form || {};
+    ctx.session.form = null;
+    if (!f.tg || !f.first) return openPanel(ctx, 'Bekor qilindi.');
+    const r = await profile.changeName(f.tg, f.first, t, ctx.from.id);
+    await openPanel(ctx, r.ok ? `✅ Ism o'zgartirildi: <b>${esc(r.old)}</b> → <b>${esc(r.name)}</b>` : `⚠️ ${esc(r.error)}`);
+    if (r.ok) ctx.telegram.sendMessage(f.tg, `ℹ️ Admin ism-familiyangizni o'zgartirdi: <b>${esc(r.name)}</b>`, { parse_mode: 'HTML' }).catch(() => {});
+    return showUser(ctx, f.tg, false);
+  });
+
   adminAction('au_last', async (ctx) => {
     await ctx.answerCbQuery();
     const list = await db('users').where('is_registered', 1).orderBy('id', 'desc').limit(15);
@@ -148,7 +179,7 @@ function register({ bot, menu, states }) {
     const kb = Markup.inlineKeyboard([
       [Markup.button.callback("💳 Balansni o'zgartirish", `au_bal:${tg}`), Markup.button.callback('📨 Xabar yozish', `adm_reply:${tg}`)],
       [Markup.button.callback('📜 Amallar tarixi', `au_tx:${tg}`), Markup.button.callback('🧮 Natijalari', `au_res:${tg}`)],
-      [Markup.button.callback(u.is_blocked ? '✅ Blokdan chiqarish' : '🚫 Bloklash', `au_blk:${tg}`)],
+      [Markup.button.callback(u.is_blocked ? '✅ Blokdan chiqarish' : '🚫 Bloklash', `au_blk:${tg}`), Markup.button.callback("✏️ Ismini o'zgartirish", `au_name:${tg}`)],
       BACK_USERS,
     ]);
     return edit ? safeEdit(ctx, text, { parse_mode: 'HTML', ...kb }) : ctx.reply(text, { parse_mode: 'HTML', ...kb });
