@@ -133,7 +133,7 @@ const routes = {
       teacherPrice: await getNum('teacher_test_price'),
       adminUsername: config.ADMIN_USERNAME,
       prices: { book: await getNum('book_price'), center: await getNum('center_price'), bookDays: await getNum('book_days'), centerDays: await getNum('center_days') },
-      testCategories: cats.list('test').map((c) => ({ code: c.code, name: c.name })),
+      testCategories: cats.list('test').map((c) => ({ code: c.code, name: c.name, label: c.label, parent: c.parent_id ? (cats.byId(c.parent_id) || {}).code || null : null })),
       videoGroups: cats.list('video').map((c) => ({ code: c.code, name: c.name })),
       centerKinds: CENTER_KINDS,
       channelUrl: require('./subscription').channel.url,
@@ -148,8 +148,8 @@ const routes = {
   'GET /api/tests': async (me, q) => {
     await need('tests', me);
     const cat = cats.find('test', q.cat);
-    if (!cat || !cat.is_active) throw new ApiError(404, 'not_found');
-    wlog(me.tg, `Testlar: ${esc(cat.name)}`);
+    if (!cat || !cats.visible(cat)) throw new ApiError(404, 'not_found');
+    wlog(me.tg, `Testlar: ${esc(cat.label)}`);
     const list = await db('variants').where({ category: cat.code, is_active: 1 }).orderBy('id');
     const owned = await purchasedIds(me.tg, 'variant');
     const pdfOwned = await purchasedIds(me.tg, 'pdf');

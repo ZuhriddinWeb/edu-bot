@@ -189,7 +189,7 @@ module.exports = (h) => {
       for (const it of items) {
         out.push({ id: it.id, title: it.title, group: it[col], groupName: cats.name(sectionOf(type), it[col]), price: it.price, active: !!it.is_active, qcount: await qCount(type, it.id), pdf: !!it.pdf_id });
       }
-      return { groups: list.map((c) => ({ code: c.code, name: c.name, active: !!c.is_active })), items: out };
+      return { groups: list.map((c) => ({ code: c.code, name: c.label, active: cats.visible(c) })), items: out };
     },
 
     'GET /api/admin/item': async (me, q) => {
@@ -305,7 +305,9 @@ module.exports = (h) => {
       const out = {};
       for (const section of ['test', 'video']) {
         out[section] = [];
-        for (const c of cats.list(section, true)) out[section].push({ id: c.id, name: c.name, active: !!c.is_active, count: await cats.contentCount(c) });
+        for (const c of cats.list(section, true)) {
+          out[section].push({ id: c.id, name: c.name, label: c.label, parent: c.parent_id || null, active: !!c.is_active, count: await cats.contentCount(c) });
+        }
       }
       return out;
     },
@@ -313,9 +315,17 @@ module.exports = (h) => {
       mustAdmin(me);
       const name = str(b.name, 60, 'Nomi');
       const section = b.section === 'video' ? 'video' : 'test';
-      if (cats.list(section, true).some((c) => c.name.toLowerCase() === name.toLowerCase() && c.id !== Number(b.id))) throw new ApiError(400, 'bad_input', "Bunday nomli bo'lim bor");
+      // Ichki bo'lim: faqat test bo'limida, faqat asosiy bo'lim ichiga
+      let parent = null;
+      if (!b.id && b.parent) {
+        const p = cats.byId(b.parent);
+        if (!p || p.parent_id || p.section !== 'test') throw new ApiError(400, 'bad_input', "Ichki bo'lim faqat test bo'limining asosiy bo'limiga qo'shiladi");
+        parent = p.id;
+      }
+      const level = b.id ? (cats.byId(b.id) || {}).parent_id || null : parent;
+      if (cats.list(section, true).some((c) => (c.parent_id || null) === level && c.name.toLowerCase() === name.toLowerCase() && c.id !== Number(b.id))) throw new ApiError(400, 'bad_input', "Bunday nomli bo'lim bor");
       if (b.id) await cats.update(Number(b.id), { name });
-      else await cats.create(section, name);
+      else await cats.create(section, name, parent);
       wlog(me.tg, `🛠 Sinf bo'limi: ${esc(name)}`);
       return { ok: true };
     },
@@ -335,6 +345,7 @@ module.exports = (h) => {
       mustAdmin(me);
       const c = cats.byId(b.id);
       if (!c) throw new ApiError(404, 'not_found');
+      if (cats.children(c.section, c.id, true).length) throw new ApiError(400, 'not_empty', "Bu bo'lim ichida ichki bo'limlar bor. Avval ularni o'chiring yoki bo'limni yashiring.");
       const n = await cats.contentCount(c);
       if (n) throw new ApiError(400, 'not_empty', `Bo'limda ${n} ta ${c.section === 'test' ? 'test' : 'mavzu'} bor. Avval ularni boshqa bo'limga ko'chiring yoki bo'limni yashiring.`);
       await cats.remove(c.id);

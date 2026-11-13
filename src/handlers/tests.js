@@ -8,7 +8,7 @@ const { startQuiz } = require('../quiz');
 const { log } = require('../logger');
 
 const catKb = () => Markup.inlineKeyboard([
-  ...cats.list('test').map((c) => [Markup.button.callback(c.name, `tc:${c.code}`)]),
+  ...cats.top('test').map((c) => [Markup.button.callback(c.name, `tc:${c.code}`)]),
   [Markup.button.callback('📄 Testlarning elektron variantlari (PDF)', 'tp_home')],
   [Markup.button.callback('🎓 Mening sertifikatlarim', 'cert_my')],
 ]);
@@ -17,14 +17,19 @@ const CAT_TEXT = '📝 <b>Test ishlash</b>\n\nBo\'limni tanlang:';
 
 async function showCategory(ctx, code) {
   const cat = cats.find('test', code);
-  if (!cat || !cat.is_active) return safeEdit(ctx, "Bu bo'lim topilmadi.");
+  if (!cat || !cats.visible(cat)) return safeEdit(ctx, "Bu bo'lim topilmadi.", Markup.inlineKeyboard([[Markup.button.callback('⬅️ Orqaga', 'tc_back')]]));
+  // Ichki bo'limlar (masalan: «Matematika va mantiqiy masalalar», «Tanqidiy fikrlash»)
+  const subs = cats.children('test', cat.id);
   const list = await db('variants').where({ category: code, is_active: 1 }).orderBy('id');
   const bought = await purchasedIds(ctx.from.id, 'variant');
-  const rows = list.map((v) => [Markup.button.callback(itemLabel(v, bought), `tv:${v.id}`)]);
-  rows.push([Markup.button.callback('⬅️ Orqaga', 'tc_back')]);
-  const text = list.length
-    ? `📝 <b>${cat.name}</b>\n\nVariantni tanlang:`
-    : `📝 <b>${cat.name}</b>\n\nHozircha variantlar qo'shilmagan. Tez orada!`;
+  const rows = subs.map((c) => [Markup.button.callback(`📂 ${c.name}`, `tc:${c.code}`)]);
+  rows.push(...list.map((v) => [Markup.button.callback(itemLabel(v, bought), `tv:${v.id}`)]));
+  const parent = cat.parent_id ? cats.byId(cat.parent_id) : null;
+  rows.push([Markup.button.callback('⬅️ Orqaga', parent ? `tc:${parent.code}` : 'tc_back')]);
+  const head = `📝 <b>${esc(cat.label)}</b>\n\n`;
+  const text = head + (subs.length && !list.length ? "Yo'nalishni tanlang:"
+    : subs.length ? "Yo'nalishni yoki variantni tanlang:"
+      : list.length ? 'Variantni tanlang:' : "Hozircha variantlar qo'shilmagan. Tez orada!");
   return safeEdit(ctx, text, { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) });
 }
 
@@ -35,7 +40,7 @@ async function showVariant(ctx, id) {
   const [{ cnt }] = await db('questions').where({ owner_type: 'variant', owner_id: id }).count({ cnt: '*' });
   const access = await hasAccess(ctx.from.id, 'variant', v);
   const u = await getUser(ctx.from.id);
-  let text = `📝 <b>${esc(v.title)}</b>\n📚 ${cat ? cat.name : ''}\n❓ Savollar soni: ${cnt}\n⏱ Vaqt: ${v.time_limit ? `${v.time_limit} daqiqa` : 'cheklanmagan'}\n💵 Narxi: ${v.price ? money(v.price) : 'bepul'}\n\n`;
+  let text = `📝 <b>${esc(v.title)}</b>\n📚 ${cat ? esc(cat.label) : ''}\n❓ Savollar soni: ${cnt}\n⏱ Vaqt: ${v.time_limit ? `${v.time_limit} daqiqa` : 'cheklanmagan'}\n💵 Narxi: ${v.price ? money(v.price) : 'bepul'}\n\n`;
   const rows = [];
   if (access) {
     text += '✅ Testni boshlashingiz mumkin.';
@@ -59,7 +64,7 @@ async function pdfHome(ctx) {
   const rows = [];
   for (const c of cats.list('test')) {
     const [{ n }] = await db('variants').where({ category: c.code, is_active: 1 }).whereNotNull('pdf_id').count({ n: '*' });
-    if (Number(n)) rows.push([Markup.button.callback(`${c.name} (${n})`, `tpc:${c.code}`)]);
+    if (Number(n)) rows.push([Markup.button.callback(`${c.label} (${n})`, `tpc:${c.code}`)]);
   }
   if (!rows.length) rows.push([Markup.button.callback("Hozircha PDF variantlar yo'q", 'tc_back')]);
   rows.push([Markup.button.callback('⬅️ Orqaga', 'tc_back')]);
@@ -74,7 +79,7 @@ async function pdfCategory(ctx, code) {
     !v.pdf_price ? `🆓 ${v.title}` : bought.has(v.id) ? `✅ ${v.title}` : `📄 ${v.title} — ${money(v.pdf_price)}`, `tpd:${v.id}`,
   )]);
   rows.push([Markup.button.callback('⬅️ Orqaga', 'tp_home')]);
-  return safeEdit(ctx, `📄 <b>${esc(cat ? cat.name : '')}</b> — elektron variantlar:`, { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) });
+  return safeEdit(ctx, `📄 <b>${esc(cat ? cat.label : '')}</b> — elektron variantlar:`, { parse_mode: 'HTML', ...Markup.inlineKeyboard(rows) });
 }
 
 async function pdfDetail(ctx, id) {
@@ -83,7 +88,7 @@ async function pdfDetail(ctx, id) {
   const own = await hasAccess(ctx.from.id, 'pdf', pdfItem(v));
   const u = await getUser(ctx.from.id);
   const cat = cats.find('test', v.category);
-  let text = `📄 <b>${esc(v.title)}</b> — elektron variant (PDF)\n📚 ${esc(cat ? cat.name : '')}\n💵 Narxi: ${v.pdf_price ? money(v.pdf_price) : 'bepul'}\n\n`;
+  let text = `📄 <b>${esc(v.title)}</b> — elektron variant (PDF)\n📚 ${esc(cat ? cat.label : '')}\n💵 Narxi: ${v.pdf_price ? money(v.pdf_price) : 'bepul'}\n\n`;
   const rows = [];
   if (own) {
     text += '✅ Sizda bor. Faylni istalgan vaqtda qayta yuklab olishingiz mumkin.';

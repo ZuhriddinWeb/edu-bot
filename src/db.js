@@ -254,6 +254,8 @@ async function migrate() {
   await addColumn('topups', 'receipt_id', (t) => t.string('receipt_id', 255));
   await addColumn('users', 'last_ad_at', (t) => t.bigInteger('last_ad_at'));
   // Ismni oxirgi marta o'zgartirgan vaqt (30 kunda bir marta cheklovi uchun)
+  // Ichki bo'limlar (masalan, «Prezident maktablari» ichida «Tanqidiy fikrlash»)
+  await addColumn('categories', 'parent_id', (t) => t.integer('parent_id'));
   await addColumn('users', 'name_changed_at', (t) => t.bigInteger('name_changed_at'));
   // Sertifikat berilgan paytdagi ism (keyingi ism o'zgarishi sertifikatga ta'sir qilmaydi)
   await addColumn('certificates', 'cert_name', (t) => t.string('cert_name', 120));

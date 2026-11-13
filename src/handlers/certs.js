@@ -18,7 +18,7 @@ async function ownerTitle(type, id) {
   const v = await db('variants').where({ id }).first();
   if (!v) return null;
   const c = cats.find('test', v.category);
-  return (c ? `${c.name} — ${v.title}` : v.title).slice(0, 250);
+  return (c ? `${c.label} — ${v.title}` : v.title).slice(0, 250);
 }
 
 // Sertifikat turi bo'yicha minimal foiz

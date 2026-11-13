@@ -280,7 +280,7 @@ function register({ bot, menu, states }) {
 
   // ================= Test varianti qo'shish =================
   adminMenu(BTN.A_TEST, (ctx) =>
-    ctx.reply("Qaysi bo'limga test varianti qo'shasiz?", Markup.inlineKeyboard(cats.list('test', true).map((c) => [Markup.button.callback(`${c.is_active ? '' : '🙈 '}${c.name}`, `at_c:${c.code}`)]))),
+    ctx.reply("Qaysi bo'limga test varianti qo'shasiz?", Markup.inlineKeyboard(cats.list('test', true).map((c) => [Markup.button.callback(`${cats.visible(c) ? '' : '🙈 '}${c.label}`, `at_c:${c.code}`)]))),
   );
 
   adminAction(/^at_c:(\w+)$/, async (ctx) => {
@@ -653,7 +653,7 @@ function register({ bot, menu, states }) {
     const [, type, id] = ctx.match;
     const list = cats.list(type === 'variant' ? 'test' : 'video', true);
     return safeEdit(ctx, "📂 Qaysi bo'limga ko'chirasiz?", Markup.inlineKeyboard([
-      ...list.map((c) => [Markup.button.callback(`${c.is_active ? '' : '🙈 '}${c.name}`, `ac_mvto:${type}:${id}:${c.code}`)]),
+      ...list.map((c) => [Markup.button.callback(`${cats.visible(c) ? '' : '🙈 '}${c.label}`, `ac_mvto:${type}:${id}:${c.code}`)]),
       [Markup.button.callback('⬅️ Orqaga', `ac_i:${type}:${id}`)],
     ]));
   });
@@ -691,10 +691,10 @@ function register({ bot, menu, states }) {
   async function showCats(ctx, section) {
     const list = cats.list(section, true);
     const rows = [];
-    for (const c of list) rows.push([Markup.button.callback(`${c.is_active ? '✅' : '🙈'} ${c.name} (${await cats.contentCount(c)})`, `cat_i:${c.id}`)]);
+    for (const c of list) rows.push([Markup.button.callback(`${c.parent_id ? '      ↳ ' : ''}${c.is_active ? '✅' : '🙈'} ${c.name} (${await cats.contentCount(c)})`, `cat_i:${c.id}`)]);
     rows.push([Markup.button.callback("➕ Yangi bo'lim qo'shish", `cat_new:${section}`)]);
     rows.push(BACK_CATS);
-    return safeEdit(ctx, `${SECTION_NAME[section]}\n\nQavs ichida — ${section === 'test' ? 'test variantlari' : 'mavzular'} soni. ✅ ko'rinadi, 🙈 yashirin.\nTartib foydalanuvchi menyusidagi tartib bilan bir xil.`, Markup.inlineKeyboard(rows));
+    return safeEdit(ctx, `${SECTION_NAME[section]}\n\nQavs ichida — ${section === 'test' ? 'test variantlari' : 'mavzular'} soni. ✅ ko'rinadi, 🙈 yashirin.\nTartib foydalanuvchi menyusidagi tartib bilan bir xil.${section === 'test' ? "\n↳ — ichki bo'lim (bo'limni ochib «➕ Ichki bo'lim qo'shish» orqali yaratiladi)." : ''}`, Markup.inlineKeyboard(rows));
   }
 
   adminAction(/^cat_l:(test|video)$/, async (ctx) => {
@@ -706,16 +706,37 @@ function register({ bot, menu, states }) {
     const c = cats.byId(id);
     if (!c) return safeEdit(ctx, "Bo'lim topilmadi.", Markup.inlineKeyboard([BACK_CATS]));
     const n = await cats.contentCount(c);
-    return safeEdit(ctx, `📂 <b>${esc(c.name)}</b>\n${SECTION_NAME[c.section]}\n${c.section === 'test' ? 'Test variantlari' : 'Mavzular'}: ${n}\nHolati: ${c.is_active ? "✅ ko'rinadi" : '🙈 yashirin'}`, {
+    const subs = cats.children(c.section, c.id, true);
+    const subRows = subs.map((x) => [Markup.button.callback(`↳ ${x.is_active ? '✅' : '🙈'} ${x.name}`, `cat_i:${x.id}`)]);
+    const canSub = c.section === 'test' && !c.parent_id;
+    return safeEdit(ctx, `📂 <b>${esc(c.label)}</b>\n${SECTION_NAME[c.section]}\n${c.section === 'test' ? 'Test variantlari' : 'Mavzular'}: ${n}\n` +
+      (canSub ? `Ichki bo'limlar: ${subs.length}\n` : '') +
+      `Holati: ${c.is_active ? "✅ ko'rinadi" : '🙈 yashirin'}` +
+      (canSub ? "\n\nℹ️ Ichki bo'lim qo'shsangiz, foydalanuvchi bu bo'limni ochganda avval ichki bo'limlar ro'yxatini ko'radi (masalan: «Matematika va mantiqiy masalalar», «Tanqidiy fikrlash»)." : ''), {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
+        ...subRows,
+        ...(canSub ? [[Markup.button.callback("➕ Ichki bo'lim qo'shish", `cat_sub:${c.id}`)]] : []),
         [Markup.button.callback("✏️ Nomini o'zgartirish", `cat_rn:${c.id}`)],
         [Markup.button.callback('⬆️ Yuqoriga', `cat_mv:${c.id}:-1`), Markup.button.callback('⬇️ Pastga', `cat_mv:${c.id}:1`)],
         [Markup.button.callback(c.is_active ? '🙈 Yashirish' : "👁 Ko'rsatish", `cat_t:${c.id}`), Markup.button.callback("🗑 O'chirish", `cat_d:${c.id}`)],
-        [Markup.button.callback("⬅️ Ro'yxat", `cat_l:${c.section}`)],
+        [Markup.button.callback(c.parent_id ? '⬅️ Asosiy bo\'limga' : "⬅️ Ro'yxat", c.parent_id ? `cat_i:${c.parent_id}` : `cat_l:${c.section}`)],
       ]),
     });
   }
+
+  // Ichki bo'lim yaratish (faqat test bo'limlari uchun, bir daraja)
+  adminAction(/^cat_sub:(\d+)$/, async (ctx) => {
+    const p = cats.byId(ctx.match[1]);
+    if (!p || p.parent_id) return ctx.answerCbQuery("Ichki bo'lim faqat asosiy bo'limga qo'shiladi", { show_alert: true });
+    await ctx.answerCbQuery();
+    ctx.session.form = { section: p.section, parent: p.id };
+    ctx.session.state = 'adm_cat_name';
+    return ctx.reply(
+      `📂 <b>${esc(p.name)}</b> ichiga yangi bo'lim nomini yozing.\n\nMasalan:\n• <code>Matematika va mantiqiy masalalar</code>\n• <code>Tanqidiy fikrlash</code>`,
+      { parse_mode: 'HTML', ...cancelKb() },
+    );
+  });
 
   adminAction(/^cat_i:(\d+)$/, async (ctx) => {
     await ctx.answerCbQuery();
@@ -744,18 +765,21 @@ function register({ bot, menu, states }) {
   adminState('adm_cat_name', async (ctx) => {
     const t = textOf(ctx);
     if (!t || t.length > 60) return ctx.reply('Nomini yozing (60 belgigacha):');
-    const { id, section } = ctx.session.form || {};
+    const { id, section, parent } = ctx.session.form || {};
     if (!section) return openPanel(ctx);
-    if (cats.list(section, true).some((c) => c.name.toLowerCase() === t.toLowerCase() && c.id !== id)) {
+    // Nom bir xil darajadagi bo'limlar orasida takrorlanmasin
+    const level = id ? (cats.byId(id) || {}).parent_id || null : parent || null;
+    if (cats.list(section, true).some((c) => (c.parent_id || null) === level && c.name.toLowerCase() === t.toLowerCase() && c.id !== id)) {
       return ctx.reply("Bunday nomli bo'lim allaqachon bor. Boshqa nom yozing:");
     }
     if (id) await cats.update(id, { name: t });
-    else await cats.create(section, t);
+    else await cats.create(section, t, parent || null);
     log(ctx.from.id, `🛠 Sinf bo'limi ${id ? "nomi o'zgardi" : 'yaratildi'}: ${esc(t)}`);
     ctx.session.form = null;
     await openPanel(ctx, `✅ Saqlandi: <b>${esc(t)}</b>`);
+    if (parent || (id && level)) return ctx.reply("Bo'limga qaytish:", Markup.inlineKeyboard([[Markup.button.callback('📂 Ochish', `cat_i:${parent || level}`)]]));
     const list = cats.list(section, true);
-    const rows = list.map((c) => [Markup.button.callback(`${c.is_active ? '✅' : '🙈'} ${c.name}`, `cat_i:${c.id}`)]);
+    const rows = list.map((c) => [Markup.button.callback(`${c.parent_id ? '      ↳ ' : ''}${c.is_active ? '✅' : '🙈'} ${c.name}`, `cat_i:${c.id}`)]);
     rows.push([Markup.button.callback("➕ Yangi bo'lim qo'shish", `cat_new:${section}`)]);
     rows.push(BACK_CATS);
     return ctx.reply(SECTION_NAME[section], Markup.inlineKeyboard(rows));
@@ -778,6 +802,9 @@ function register({ bot, menu, states }) {
   adminAction(/^cat_d:(\d+)$/, async (ctx) => {
     const c = cats.byId(ctx.match[1]);
     if (!c) return ctx.answerCbQuery();
+    if (cats.children(c.section, c.id, true).length) {
+      return ctx.answerCbQuery("Bu bo'lim ichida ichki bo'limlar bor. Avval ularni o'chiring yoki bo'limni yashiring.", { show_alert: true });
+    }
     const n = await cats.contentCount(c);
     if (n) {
       return ctx.answerCbQuery(`Bu bo'limda ${n} ta ${c.section === 'test' ? 'test' : 'mavzu'} bor. Avval ularni «🗂 Kontent» orqali boshqa bo'limga ko'chiring yoki o'chiring. Yoki bo'limni yashiring.`, { show_alert: true });
@@ -792,10 +819,11 @@ function register({ bot, menu, states }) {
     const c = cats.byId(ctx.match[1]);
     if (!c) return ctx.answerCbQuery();
     if (await cats.contentCount(c)) return ctx.answerCbQuery("Bo'limda kontent bor", { show_alert: true });
+    if (cats.children(c.section, c.id, true).length) return ctx.answerCbQuery("Ichida ichki bo'limlar bor", { show_alert: true });
     await cats.remove(c.id);
     log(ctx.from.id, `🛠 Sinf bo'limi o'chirildi: ${esc(c.name)}`);
     await ctx.answerCbQuery("🗑 O'chirildi");
-    return showCats(ctx, c.section);
+    return c.parent_id ? showCat(ctx, c.parent_id) : showCats(ctx, c.section);
   });
 
   // ================= Narxlar va sozlamalar =================

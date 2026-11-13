@@ -192,7 +192,7 @@ module.exports = (h) => {
         const items = await db('variants').where({ category: c.code, is_active: 1 }).whereNotNull('pdf_id').orderBy('id');
         if (items.length) {
           out.push({
-            code: c.code, name: c.name,
+            code: c.code, name: c.label,
             items: items.map((v) => ({ id: v.id, title: v.title, price: v.pdf_price, owned: !v.pdf_price || me.admin || owned.has(v.id) })),
           });
         }

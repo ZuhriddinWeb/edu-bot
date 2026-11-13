@@ -72,6 +72,10 @@
   .hero .avatar { width: 46px; height: 46px; border-radius: 15px; background: rgba(255,255,255,.18); display: grid; place-items: center; font: 700 18px var(--display); }
   .hero .name { font-weight: 700; font-size: 16px; }
   .hero .who { cursor: pointer; }
+  .catrow { flex-wrap: wrap; row-gap: 8px; }
+  .row.catrow > .grow { flex: 0 0 100% !important; max-width: 100%; }
+  .catrow.child { padding-left: 34px; background: rgba(91,75,219,.04); }
+  .catrow .cbtns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .hero .edit-n { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 12px; opacity: .85; background: rgba(255,255,255,.16); border-radius: 999px; padding: 2px 9px; }
   .hero .phone { font-size: 13px; opacity: .78; }
   .hero .bal-l { margin-top: 22px; font-size: 13px; opacity: .8; }
@@ -397,7 +401,7 @@
   // ---------- Testlar ----------
   async function testsCats() {
     const grade = (n) => { const m = String(n).match(/^(\d+(?:-\d+)?)/); return m ? m[1] : null; };
-    app.innerHTML = `<h1>Test ishlash</h1><h2>Sinfni tanlang</h2><div class="list">${ME.testCategories.map((c) => {
+    app.innerHTML = `<h1>Test ishlash</h1><h2>Sinfni tanlang</h2><div class="list">${ME.testCategories.filter((c) => !c.parent).map((c) => {
       const g = grade(c.name);
       return `<button class="row" data-act="tcat" data-arg="${c.code}">${g ? `<span class="grade">${h(g)}</span>` : `<span class="chipi y">${I.trophy}</span>`}<span class="grow title">${h(c.name)}</span><span class="chev">›</span></button>`;
     }).join('')}</div>
@@ -414,11 +418,16 @@
   async function testsList(code) {
     loading();
     const cat = ME.testCategories.find((c) => c.code === code);
+    const subs = ME.testCategories.filter((c) => c.parent === code); // ichki bo'limlar
     const list = await api(`/api/tests?cat=${code}`);
-    app.innerHTML = `<h1>📝 ${h(cat.name)}</h1>` + (list.length ? `<div class="list">${list.map((v) =>
+    const parent = cat.parent ? ME.testCategories.find((c) => c.code === cat.parent) : null;
+    app.innerHTML = `${parent ? `<div class="muted" style="margin:0 6px 2px">${h(parent.name)}</div>` : ''}<h1>📝 ${h(cat.name)}</h1>` +
+      (subs.length ? `<h2>Yo'nalishni tanlang</h2><div class="list">${subs.map((c) =>
+        `<button class="row" data-act="tcat" data-arg="${c.code}"><span class="chipi b">${I.test}</span><span class="grow title">${h(c.name)}</span><span class="chev">›</span></button>`).join('')}</div>` : '') +
+      (list.length ? `${subs.length ? '<h2>Variantlar</h2>' : ''}<div class="list">${list.map((v) =>
       `<button class="row" data-act="tvar" data-arg="${v.id}"><span class="grow"><div class="title">${h(v.title)}</div>
        <div class="muted">❓ ${v.qcount} ta savol · ⏱ ${v.time_limit ? `${v.time_limit} daqiqa` : 'cheklanmagan'}${v.pdf ? ' · 📄 PDF' : ''}</div></span>${itemBadge(v)}</button>`).join('')}</div>`
-      : '<div class="empty">Hozircha variantlar qo\'shilmagan</div>');
+      : subs.length ? '' : '<div class="empty">Hozircha variantlar qo\'shilmagan</div>');
     actions.tvar = (id) => go(itemScreen, 'variant', list.find((x) => String(x.id) === id), code);
     bind();
   }
@@ -1498,11 +1507,16 @@
   async function adCatsScreen() {
     loading();
     const d = await api('/api/admin/cats');
-    const sec = (key, title) => `<h2>${title}</h2><div class="list">${d[key].map((c, i) => `<div class="row"><span class="grow"><div class="title">${c.active ? '' : '🙈 '}${h(c.name)}</div><div class="sub">${c.count} ta ${key === 'test' ? 'test' : 'mavzu'}</div></span>
-        <button class="badge" data-act="mv" data-arg="${c.id}:-1" ${i === 0 ? 'disabled' : ''}>↑</button><button class="badge" data-act="mv" data-arg="${c.id}:1" ${i === d[key].length - 1 ? 'disabled' : ''}>↓</button>
-        <button class="badge" data-act="rn" data-arg="${c.id}">✏️</button>${swHtml(c.active, 'tg', c.id)}<button class="badge" data-act="dl" data-arg="${c.id}">🗑</button></div>`).join('')}</div>
+    const sec = (key, title) => `<h2>${title}</h2><div class="list">${d[key].map((c) => {
+      const sib = d[key].filter((x) => (x.parent || null) === (c.parent || null)); const i = sib.indexOf(c);
+      const subN = d[key].filter((x) => x.parent === c.id).length;
+      return `<div class="row catrow${c.parent ? ' child' : ''}"><span class="grow"><div class="title">${c.parent ? '↳ ' : ''}${c.active ? '' : '🙈 '}${h(c.name)}</div><div class="sub">${c.count} ta ${key === 'test' ? 'test' : 'mavzu'}${subN ? ` · ${subN} ta ichki bo'lim` : ''}</div></span>
+        <div class="cbtns"><button class="badge" data-act="mv" data-arg="${c.id}:-1" ${i === 0 ? 'disabled' : ''}>↑</button><button class="badge" data-act="mv" data-arg="${c.id}:1" ${i === sib.length - 1 ? 'disabled' : ''}>↓</button>
+        ${key === 'test' && !c.parent ? `<button class="badge" data-act="sub" data-arg="${c.id}" title="Ichki bo'lim qo'shish">＋📂</button>` : ''}
+        <button class="badge" data-act="rn" data-arg="${c.id}">✏️</button>${swHtml(c.active, 'tg', c.id)}<button class="badge" data-act="dl" data-arg="${c.id}">🗑</button></div></div>`;
+    }).join('')}</div>
       <div class="add-row"><input id="n_${key}" placeholder="Yangi bo'lim: masalan 8-sinf yoki 9-11-sinf"><button class="btn" data-act="add" data-arg="${key}">${I.plus}</button></div>`;
-    app.innerHTML = `<h1>Sinf bo'limlari</h1><p class="muted" style="margin:0 4px 6px">Sinflarni alohida («5-sinf») yoki birgalikda («6-7-sinf») qilib bo'lim yarating. Tartib foydalanuvchi menyusida ham shunday bo'ladi.</p>
+    app.innerHTML = `<h1>Sinf bo'limlari</h1><p class="muted" style="margin:0 4px 6px">Sinflarni alohida («5-sinf») yoki birgalikda («6-7-sinf») qilib bo'lim yarating. Tartib foydalanuvchi menyusida ham shunday bo'ladi. «＋📂» — bo'lim ichiga ichki bo'lim qo'shish (masalan «Tanqidiy fikrlash»).</p>
       ${sec('test', 'Test bo\'limlari')}${sec('video', 'Videodars bo\'limlari')}`;
     const all = [...d.test, ...d.video];
     const call = async (path, body) => { try { await api(path, body); adCatsScreen(); } catch (e) { say(e.message); } };
@@ -1510,7 +1524,18 @@
     actions.tg = (id) => call('/api/admin/cat/toggle', { id: Number(id) });
     actions.dl = async (id) => { if (await confirmBox("Bo'lim o'chirilsinmi?")) call('/api/admin/cat/delete', { id: Number(id) }); };
     actions.rn = (id) => { const c = all.find((x) => String(x.id) === id); go(adCatRenameScreen, c); };
+    actions.sub = (id) => { const c = all.find((x) => String(x.id) === id); go(adCatSubScreen, c); };
     actions.add = (key) => { const n = val(`n_${key}`).trim(); if (!n) return say('Nomini yozing'); call('/api/admin/cat/save', { section: key, name: n }); };
+    bind();
+  }
+  // Ichki bo'lim qo'shish
+  function adCatSubScreen(p) {
+    app.innerHTML = `<h1>Ichki bo'lim</h1><p class="muted" style="margin:0 4px 10px">«${h(p.name)}» ichida yangi bo'lim. Foydalanuvchi bu bo'limni ochganda avval ichki bo'limlarni ko'radi.</p>
+      <input id="sn" maxlength="60" placeholder="Masalan: Tanqidiy fikrlash"><button class="btn" data-act="ok">${I.plus}Qo'shish</button>`;
+    actions.ok = (a, el) => submitting(el, async () => {
+      const n = val('sn').trim(); if (!n) return say('Nomini yozing');
+      await api('/api/admin/cat/save', { section: 'test', name: n, parent: p.id }); say('✅ Qo\'shildi'); back();
+    });
     bind();
   }
   function adCatRenameScreen(c) {
